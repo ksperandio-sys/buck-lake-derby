@@ -117,6 +117,16 @@
         "<br>Try opening this in your phone's browser (Chrome/Safari) instead of an in-app preview, or reload the page.";
     }
   });
+  // Sync errors alone don't cover async failures (e.g. a rejected Firebase write) —
+  // those need this separate handler or they fail completely silently.
+  window.addEventListener("unhandledrejection", function(e){
+    var box = document.getElementById("fatalError");
+    if(box){
+      box.style.display = "block";
+      box.innerHTML = "⚠️ Something didn't go through: " + (e.reason&&e.reason.message ? e.reason.message : "unknown error") +
+        "<br>Reload the page and try again. If it keeps happening, check your database security rules in Firebase.";
+    }
+  });
 </script>
 
 
@@ -287,12 +297,12 @@ let EVENTS = {
   "2026-07-09": {
     "World Cup": [
       { id:"wc_qf1", title:"Quarterfinal 1", teams:["TBD","TBD"], time:"2026-07-09T16:00:00-04:00",
-        odds:{home:-110, away:-110, draw:240}, props:[
+        odds:{home:-110, away:-110}, props:[
           { id:"wc_qf1_ot", q:"Match decided in extra time or penalties?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
           { id:"wc_qf1_gt3", q:"Total goals over/under 2.5", options:[{label:"Over 2.5",odds:-105},{label:"Under 2.5",odds:-115}] }
         ]},
       { id:"wc_qf2", title:"Quarterfinal 2", teams:["TBD","TBD"], time:"2026-07-09T20:00:00-04:00",
-        odds:{home:-130, away:220, draw:250}, props:[
+        odds:{home:-130, away:220}, props:[
           { id:"wc_qf2_bts", q:"Both teams to score?", options:[{label:"Yes",odds:-120},{label:"No",odds:100}] }
         ]}
     ],
@@ -312,9 +322,9 @@ let EVENTS = {
   "2026-07-10": {
     "World Cup": [
       { id:"wc_qf3", title:"Quarterfinal 3", teams:["TBD","TBD"], time:"2026-07-10T16:00:00-04:00",
-        odds:{home:150, away:-170, draw:245}, props:[]},
+        odds:{home:150, away:-170}, props:[]},
       { id:"wc_qf4", title:"Quarterfinal 4", teams:["TBD","TBD"], time:"2026-07-10T20:00:00-04:00",
-        odds:{home:-140, away:280, draw:260}, props:[]}
+        odds:{home:-140, away:280}, props:[]}
     ],
     "Wimbledon": [
       { id:"wim_m_semi1", title:"Men's Semifinal 1", teams:["TBD","TBD"], time:"2026-07-10T08:30:00-04:00",
@@ -492,10 +502,12 @@ function openNameModal(defaultVal){
   document.getElementById("nameModalInput").value = defaultVal||"";
   document.getElementById("nameModalBackdrop").classList.add("open");
   document.getElementById("nameModal").style.display = "block";
+  document.body.style.overflow = "hidden";
 }
 function closeNameModal(){
   document.getElementById("nameModalBackdrop").classList.remove("open");
   document.getElementById("nameModal").style.display = "none";
+  document.body.style.overflow = "";
 }
 async function saveNameFromModal(){
   const val = document.getElementById("nameModalInput").value.trim();
@@ -757,11 +769,13 @@ function updateSlipFab(){
 function openSlip(){
   document.getElementById("modalBackdrop").classList.add("open");
   document.getElementById("slipModal").style.display = "block";
+  document.body.style.overflow = "hidden"; // prevent the background page from scrolling under the modal
   renderSlip();
 }
 function closeSlip(){
   document.getElementById("modalBackdrop").classList.remove("open");
   document.getElementById("slipModal").style.display = "none";
+  document.body.style.overflow = "";
   requestAnimationFrame(syncStickyOffset);
 }
 function removeLeg(i){ slip.splice(i,1); updateSlipFab(); renderSlip(); renderView(); }
@@ -863,16 +877,22 @@ async function placeBet(){
   const betsRef = db.ref("bets/"+currentUser.uid);
   const userRef = db.ref("users/"+currentUser.uid);
 
-  if(mode==="parlay"){
-    await betsRef.push({
-      type:"parlay", legs:slip, stake, placedAt:Date.now(), status:"pending"
-    });
-  } else {
-    for(const l of slip){
-      await betsRef.push({ type:"single", legs:[l], stake, placedAt:Date.now(), status:"pending" });
+  try{
+    if(mode==="parlay"){
+      await betsRef.push({
+        type:"parlay", legs:slip, stake, placedAt:Date.now(), status:"pending"
+      });
+    } else {
+      for(const l of slip){
+        await betsRef.push({ type:"single", legs:[l], stake, placedAt:Date.now(), status:"pending" });
+      }
     }
+    await userRef.child("credits").set(userCredits - totalStakeNeeded);
+  }catch(err){
+    console.error("placeBet failed", err);
+    toast("Bet didn't go through — " + (err.code==="PERMISSION_DENIED" ? "check your database security rules." : err.message));
+    return;
   }
-  await userRef.child("credits").set(userCredits - totalStakeNeeded);
 
   slip = [];
   updateSlipFab();
