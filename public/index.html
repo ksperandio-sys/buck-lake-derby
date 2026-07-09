@@ -270,6 +270,18 @@ function mmaFight(id, time, fighterA, oddsA, fighterB, oddsB, rounds){
   };
 }
 
+// Standard MLB prop set. Works with placeholder "Home"/"Away" labels for games
+// whose real matchup isn't confirmed yet — auto-fetch fills in the moneyline and
+// team names later, but these prop labels stay generic until an admin updates
+// them (or you just re-seed once the real teams are known).
+function mlbProps(gameId, homeLabel, awayLabel){
+  return [
+    { id:gameId+"_runs", q:"Total runs over/under 8.5", options:[{label:"Over 8.5",odds:-110},{label:"Under 8.5",odds:-110}] },
+    { id:gameId+"_fts", q:"First team to score", options:[{label:homeLabel,odds:-120},{label:awayLabel,odds:100}] },
+    { id:gameId+"_5plus", q:"Does either team score 5+ runs?", options:[{label:"Yes",odds:-150},{label:"No",odds:120}] }
+  ];
+}
+
 let EVENTS = {
   "2026-07-09": {
     "World Cup": [
@@ -286,10 +298,14 @@ let EVENTS = {
     "Wimbledon": [
       { id:"wim_w_semi1", title:"Women's Semifinal 1", teams:["TBD","TBD"], time:"2026-07-09T08:30:00-04:00",
         odds:{home:-140, away:120}, props:[
-          { id:"wim_w_semi1_sets", q:"Match goes 3 sets?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] }
+          { id:"wim_w_semi1_sets", q:"Match goes 3 sets?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
+          { id:"wim_w_semi1_df", q:"Total double faults (both players combined) over/under 12.5", options:[{label:"Over 12.5",odds:-110},{label:"Under 12.5",odds:-110}] }
         ]},
       { id:"wim_w_semi2", title:"Women's Semifinal 2", teams:["TBD","TBD"], time:"2026-07-09T10:30:00-04:00",
-        odds:{home:130, away:-150}, props:[]}
+        odds:{home:130, away:-150}, props:[
+          { id:"wim_w_semi2_sets", q:"Match goes 3 sets?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
+          { id:"wim_w_semi2_df", q:"Total double faults (both players combined) over/under 12.5", options:[{label:"Over 12.5",odds:-110},{label:"Under 12.5",odds:-110}] }
+        ]}
     ]
   },
   "2026-07-10": {
@@ -302,26 +318,31 @@ let EVENTS = {
     "Wimbledon": [
       { id:"wim_m_semi1", title:"Men's Semifinal 1", teams:["TBD","TBD"], time:"2026-07-10T08:30:00-04:00",
         odds:{home:-160, away:135}, props:[
-          { id:"wim_m_semi1_sets", q:"Match goes 5 sets?", options:[{label:"Yes",odds:170},{label:"No",odds:-200}] }
+          { id:"wim_m_semi1_sets", q:"Match goes 5 sets?", options:[{label:"Yes",odds:170},{label:"No",odds:-200}] },
+          { id:"wim_m_semi1_df", q:"Total double faults (both players combined) over/under 14.5", options:[{label:"Over 14.5",odds:-110},{label:"Under 14.5",odds:-110}] }
         ]},
       { id:"wim_m_semi2", title:"Men's Semifinal 2", teams:["TBD","TBD"], time:"2026-07-10T10:30:00-04:00",
-        odds:{home:110, away:-130}, props:[]}
+        odds:{home:110, away:-130}, props:[
+          { id:"wim_m_semi2_sets", q:"Match goes 5 sets?", options:[{label:"Yes",odds:170},{label:"No",odds:-200}] },
+          { id:"wim_m_semi2_df", q:"Total double faults (both players combined) over/under 14.5", options:[{label:"Over 14.5",odds:-110},{label:"Under 14.5",odds:-110}] }
+        ]}
     ],
     "MLB": [
       { id:"mlb_jul10_1", title:"MLB Game — set via Admin", teams:["TBD","TBD"], time:"2026-07-10T19:07:00-04:00",
-        odds:{home:-115, away:-105}, props:[]}
+        odds:{home:-115, away:-105}, props: mlbProps("mlb_jul10_1","Home","Away")}
     ]
   },
   "2026-07-11": {
     "Wimbledon": [
       { id:"wim_womens_final", title:"Women's Singles Final", teams:["TBD","TBD"], time:"2026-07-11T09:00:00-04:00",
         odds:{home:-150, away:130}, props:[
-          { id:"wim_w_sets", q:"Match goes to 3 sets?", options:[{label:"Yes",odds:145},{label:"No",odds:-175}] }
+          { id:"wim_w_sets", q:"Match goes to 3 sets?", options:[{label:"Yes",odds:145},{label:"No",odds:-175}] },
+          { id:"wim_w_final_df", q:"Total double faults (both players combined) over/under 12.5", options:[{label:"Over 12.5",odds:-110},{label:"Under 12.5",odds:-110}] }
         ]}
     ],
     "MLB": [
       { id:"mlb_dodgers_ari_1", title:"Arizona Diamondbacks @ LA Dodgers", teams:["Diamondbacks","Dodgers"], time:"2026-07-11T21:10:00-04:00",
-        odds:{home:-165, away:145}, props:[]}
+        odds:{home:-165, away:145}, props: mlbProps("mlb_dodgers_ari_1","Dodgers","Diamondbacks")}
     ],
     "UFC 329 — Early Prelims (5pm ET)": [
       mmaFight("ufc_ep1","2026-07-11T17:00:00-04:00","Tracy Cortez",-135,"Cong Wang",115,3),
@@ -348,14 +369,15 @@ let EVENTS = {
     "Wimbledon": [
       { id:"wim_mens_final", title:"Men's Singles Final", teams:["TBD","TBD"], time:"2026-07-12T09:00:00-04:00",
         odds:{home:-140, away:120}, props:[
-          { id:"wim_m_sets", q:"Match goes 5 sets?", options:[{label:"Yes",odds:160},{label:"No",odds:-190}] }
+          { id:"wim_m_sets", q:"Match goes 5 sets?", options:[{label:"Yes",odds:160},{label:"No",odds:-190}] },
+          { id:"wim_m_final_df", q:"Total double faults (both players combined) over/under 14.5", options:[{label:"Over 14.5",odds:-110},{label:"Under 14.5",odds:-110}] }
         ]}
     ],
     "MLB": [
       { id:"mlb_dodgers_ari_2", title:"Arizona Diamondbacks @ LA Dodgers", teams:["Diamondbacks","Dodgers"], time:"2026-07-12T16:10:00-04:00",
-        odds:{home:-155, away:135}, props:[]},
+        odds:{home:-155, away:135}, props: mlbProps("mlb_dodgers_ari_2","Dodgers","Diamondbacks")},
       { id:"mlb_jays_jul12", title:"Blue Jays — set via Admin", teams:["TBD","TBD"], time:"2026-07-12T17:00:00-04:00",
-        odds:{home:-110, away:-110}, props:[]}
+        odds:{home:-110, away:-110}, props: mlbProps("mlb_jays_jul12","Home","Away")}
     ]
   }
 };
