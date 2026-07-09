@@ -638,7 +638,7 @@ function getDerbyPointsForUser(uid){
 
 function renderLeaderboard(main){
   document.getElementById("slipFab").classList.add("hidden");
-  const DERBY_WEIGHT = 0.8, BETTING_WEIGHT = 0.2;
+  const DERBY_WEIGHT = 1.0, BETTING_WEIGHT = 0.2;
   const arr = Object.entries(allUsers).map(([uid,u])=>{
     const derbyPts = getDerbyPointsForUser(uid);
     const credits = u.credits ?? 100;
@@ -657,7 +657,7 @@ function renderLeaderboard(main){
   main.innerHTML = `
     <div class="card">
       <h3 style="margin-top:0;">🏆 Leaderboard</h3>
-      <p style="color:var(--muted);font-size:.8rem;margin-top:-6px;">Total = (Derby points × 80%) + (Betting credits × 20%). All bets lock before each event's start time; catches count once admin-verified.</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-top:-6px;">Total = (Derby points × 100%) + (Betting credits × 20%). All bets lock before each event's start time; catches count once admin-verified.</p>
       <table><tr><th>#</th><th>Player</th><th style="text-align:right;">Derby</th><th style="text-align:right;">Betting</th><th style="text-align:right;">Total</th></tr>${rows || '<tr><td colspan="5" class="empty">No players yet</td></tr>'}</table>
     </div>
     <div class="card" style="text-align:center;color:var(--muted);font-size:.8rem;">
