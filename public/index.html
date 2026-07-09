@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>28th Annual Buck Lake Fishing Derby</title>
+
+<!-- Makes "Add to Home Screen" behave like a real app: full-screen, no address bar, proper name/icon/color -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Buck Lake Derby">
+<meta name="theme-color" content="#0b0e14">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230b0e14'/%3E%3Ctext x='50' y='68' font-size='55' text-anchor='middle'%3E%F0%9F%8E%A3%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230b0e14'/%3E%3Ctext x='50' y='68' font-size='55' text-anchor='middle'%3E%F0%9F%8E%A3%3C/text%3E%3C/svg%3E">
+
+<!-- Firebase (compat SDK) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#131826; --panel2:#1a2033; --line:#242b40;
+    --text:#eef1f8; --muted:#8b93a7; --accent:#3fd0c9; --accent2:#f5b942;
+    --win:#33c17a; --lose:#e2586b; --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  header{padding:14px 16px 6px;border-bottom:1px solid var(--line);}
+  #topBar{position:sticky;top:0;z-index:50;background:var(--bg);box-shadow:0 4px 12px rgba(0,0,0,.25);}
+  #swipeArea{overflow-x:hidden;touch-action:pan-y;}
+  .daytabs{position:sticky;z-index:40;background:var(--bg);padding-top:10px;margin-bottom:0 !important;padding-bottom:10px;border-bottom:1px solid var(--line);}
+  .subtabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;}
+  .subtabs button{flex:0 0 auto;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:10px;font-size:.8rem;cursor:pointer;}
+  .subtabs button.active{border-color:var(--accent);color:var(--accent);}
+  .toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--accent);color:var(--text);padding:9px 18px;border-radius:999px;font-size:.8rem;z-index:200;box-shadow:0 6px 20px rgba(0,0,0,.4);transition:opacity .3s;}
+  .toast.hidden{opacity:0;pointer-events:none;}
+  .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--win);margin-right:5px;box-shadow:0 0 6px var(--win);animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  header h1{margin:0;font-size:1.15rem;letter-spacing:.3px;}
+  header h1 span{color:var(--accent2);}
+  .userbar{display:flex;align-items:center;justify-content:space-between;margin-top:8px;font-size:.85rem;color:var(--muted);}
+  .credits-pill{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-weight:600;color:var(--accent2);}
+  nav{display:flex;gap:6px;overflow-x:auto;padding:10px 16px;background:var(--bg);border-bottom:1px solid var(--line);}
+  nav button{flex:0 0 auto;background:none;border:1px solid var(--line);color:var(--muted);padding:8px 14px;border-radius:999px;font-size:.85rem;cursor:pointer;white-space:nowrap;}
+  nav button.active{background:var(--accent);color:#04211f;border-color:var(--accent);font-weight:700;}
+  main{padding:14px 16px 100px;max-width:720px;margin:0 auto;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px;}
+  .daytabs{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;}
+  .daytabs button{flex:0 0 auto;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:10px;font-size:.8rem;cursor:pointer;}
+  .daytabs button.active{border-color:var(--accent);color:var(--accent);}
+  .sport-header{display:flex;align-items:center;gap:8px;margin:18px 0 8px;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;}
+  .sport-header::after{content:"";flex:1;height:1px;background:var(--line);}
+  .locked-badge{font-size:.65rem;background:var(--panel2);color:var(--muted);padding:2px 8px;border-radius:6px;margin-left:6px;}
+  .event{margin-bottom:10px;}
+  .event-title{font-weight:600;font-size:.95rem;margin-bottom:2px;}
+  .event-time{font-size:.75rem;color:var(--muted);margin-bottom:8px;}
+  .pickrow{display:flex;gap:8px;}
+  .pickbtn{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer;}
+  .pickbtn .side{font-size:.8rem;font-weight:600;}
+  .pickbtn .odds{font-size:.85rem;color:var(--accent2);margin-top:2px;}
+  .pickbtn.selected{border-color:var(--accent);background:rgba(63,208,201,.12);}
+  .pickbtn.disabled{opacity:.35;pointer-events:none;}
+  .prop-q{font-size:.88rem;margin-bottom:8px;}
+  .prop-options{display:flex;flex-wrap:wrap;gap:8px;}
+  .prop-options .pickbtn{flex:1 1 45%;}
+  .slip-fab{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--accent2);color:#26200a;border:none;border-radius:999px;padding:12px 22px;font-weight:700;font-size:.9rem;box-shadow:0 8px 24px rgba(0,0,0,.4);cursor:pointer;z-index:60;}
+  .slip-fab .count{background:#26200a;color:var(--accent2);border-radius:999px;padding:1px 8px;margin-left:6px;font-size:.75rem;}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;}
+  .modal-backdrop.open{display:block;}
+  .modal{position:fixed;left:0;right:0;bottom:0;max-height:85vh;overflow-y:auto;background:var(--panel);border-radius:20px 20px 0 0;padding:18px 16px 24px;z-index:101;}
+  .modal h3{margin-top:0;}
+  .leg{display:flex;justify-content:space-between;align-items:center;background:var(--panel2);border-radius:10px;padding:10px;margin-bottom:8px;font-size:.85rem;}
+  .leg .x{color:var(--lose);cursor:pointer;font-weight:700;padding:0 6px;}
+  .stakebar{display:flex;align-items:center;gap:10px;margin:14px 0;}
+  .stakebar input{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:10px;border-radius:10px;font-size:1rem;}
+  .summary-row{display:flex;justify-content:space-between;font-size:.85rem;color:var(--muted);margin-bottom:4px;}
+  .summary-row b{color:var(--text);}
+  .btn{width:100%;background:var(--accent);color:#04211f;border:none;padding:13px;border-radius:12px;font-weight:700;font-size:.95rem;cursor:pointer;}
+  .btn:disabled{opacity:.4;}
+  .btn-secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line);}
+  .close-x{position:absolute;top:14px;right:16px;color:var(--muted);font-size:1.3rem;cursor:pointer;}
+  table{width:100%;border-collapse:collapse;}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);font-size:.85rem;}
+  th{color:var(--muted);font-weight:500;font-size:.7rem;text-transform:uppercase;}
+  .rank1{color:var(--accent2);font-weight:700;}
+  .badge-win{color:var(--win);}.badge-lose{color:var(--lose);}
+  .empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:.9rem;}
+  .login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:20px;}
+  .login-screen button{margin-top:20px;background:var(--accent);color:#04211f;border:none;padding:14px 26px;border-radius:12px;font-weight:700;font-size:1rem;cursor:pointer;}
+  .adminbox textarea,.adminbox input,.adminbox select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px;border-radius:8px;margin-bottom:8px;font-size:.85rem;}
+  .adminbox label{font-size:.75rem;color:var(--muted);}
+  .hidden{display:none !important;}
+  .tag{display:inline-block;font-size:.65rem;padding:2px 8px;border-radius:6px;background:var(--panel2);color:var(--muted);margin-left:6px;}
+</style>
+</head>
+<body>
+
+<noscript>
+  <div style="background:#0b0e14;color:#eef1f8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:sans-serif;text-align:center;">
+    <div>
+      <h2>🎣 This needs JavaScript enabled</h2>
+      <p>You're likely viewing this inside an app's built-in preview (a messaging app, email, etc.) which blocks scripts.</p>
+      <p><b>Fix:</b> tap the link, then choose "Open in browser," "Open in Chrome," or "Open in Safari" instead.</p>
+    </div>
+  </div>
+</noscript>
+
+<div id="fatalError" style="display:none;background:#2a1216;color:#ffd7d7;padding:16px;font-family:sans-serif;font-size:.85rem;position:fixed;top:0;left:0;right:0;z-index:9999;"></div>
+<script>
+  window.addEventListener("error", function(e){
+    var box = document.getElementById("fatalError");
+    if(box){
+      box.style.display = "block";
+      box.innerHTML = "⚠️ Something failed to load: " + (e.message||"unknown error") +
+        "<br>Try opening this in your phone's browser (Chrome/Safari) instead of an in-app preview, or reload the page.";
+    }
+  });
+</script>
+
+
+<div id="loginScreen" class="login-screen hidden">
+  <h1>🎣 28th Annual <span>Buck Lake Fishing Derby</span></h1>
+  <p style="color:var(--muted);max-width:320px;">World Cup Quarterfinals, Wimbledon, UFC 329 (full card), MLB &amp; the Buck Lake fish tracker — Jul 9–12.<br>Everyone starts with 100 credits. Fake money, real bragging rights.</p>
+  <button onclick="signIn()">Sign in with Google</button>
+</div>
+
+<div id="app" class="hidden">
+  <div id="topBar">
+    <header>
+      <h1>🎣 28th Annual <span>Buck Lake Fishing Derby</span></h1>
+      <div class="userbar">
+        <span id="userName" onclick="promptRename()" style="text-decoration:underline dotted;cursor:pointer;">—</span>
+        <span style="display:flex;align-items:center;gap:10px;">
+          <span id="liveIndicator" style="font-size:.7rem;"><span class="live-dot"></span>Live odds</span>
+          <span class="credits-pill">💰 <span id="creditsDisplay">100</span> credits</span>
+        </span>
+      </div>
+    </header>
+
+    <nav id="mainNav">
+      <button data-view="leaderboard" class="active">Leaderboard</button>
+      <button data-view="derby">🎣 Derby</button>
+      <button data-view="mybets">My Bets</button>
+      <button data-view="games">Game Bets</button>
+      <button data-view="props">Prop Bets</button>
+      <button data-view="admin" id="adminNavBtn" class="hidden">Admin</button>
+    </nav>
+  </div>
+
+  <div id="swipeArea">
+    <main id="main"></main>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+
+<button id="slipFab" class="slip-fab hidden" onclick="openSlip()">🎟 Bet Slip <span class="count" id="slipCount">0</span></button>
+
+<div id="modalBackdrop" class="modal-backdrop" onclick="closeSlip()"></div>
+<div id="slipModal" class="modal" style="display:none;">
+  <span class="close-x" onclick="closeSlip()">✕</span>
+  <h3 id="slipTitle">Bet Slip</h3>
+  <div id="slipLegs"></div>
+  <div id="slipEmpty" class="empty hidden">No picks yet. Tap odds to add them.</div>
+  <div id="slipControls" class="hidden">
+    <label style="font-size:.8rem;color:var(--muted);">Bet type</label>
+    <select id="betTypeSelect" style="width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px;border-radius:8px;margin:6px 0 12px;" onchange="renderSlip()"></select>
+    <div class="stakebar">
+      <span style="font-size:.85rem;color:var(--muted);">Stake</span>
+      <input type="number" id="stakeInput" min="1" step="1" placeholder="credits" oninput="renderSlip()">
+    </div>
+    <div class="summary-row"><span>Combined odds</span><b id="combOdds">—</b></div>
+    <div class="summary-row"><span>To win</span><b id="toWin">—</b></div>
+    <div class="summary-row"><span>Available balance</span><b id="availBal">—</b></div>
+    <button class="btn" id="placeBtn" onclick="placeBet()">Place Bet</button>
+  </div>
+</div>
+
+<div id="nameModalBackdrop" class="modal-backdrop" onclick="void(0)"></div>
+<div id="nameModal" class="modal" style="display:none;">
+  <span class="close-x" onclick="closeNameModal()">✕</span>
+  <h3 id="nameModalTitle">Pick a display name</h3>
+  <p style="font-size:.8rem;color:var(--muted);margin-top:-8px;">This is what shows up on the leaderboards — call yourself whatever you want.</p>
+  <input id="nameModalInput" placeholder="e.g. Cap'n Karlo" style="width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:12px;border-radius:10px;font-size:1rem;margin:12px 0;">
+  <button class="btn" onclick="saveNameFromModal()">Save</button>
+</div>
+
+<div id="notInvitedScreen" class="login-screen hidden">
+  <h1>🎣 28th Annual <span>Buck Lake Fishing Derby</span></h1>
+  <p style="color:var(--muted);max-width:320px;">This pool is invite-only. Your email isn't on the list yet — ask whoever's running the derby to add you.</p>
+  <button onclick="signOutUser()" style="margin-top:20px;background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:12px 22px;border-radius:12px;cursor:pointer;">Sign out</button>
+</div>
+
+
+<script>
+/* =========================================================
+   FIREBASE CONFIG — replace with your own project's config
+   (same project as your World Cup pool app, or a new one)
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyDUZuBPt-2wfh1Hy09GePdU4tl-SDQs034",
+  authDomain: "derbysportsbook.firebaseapp.com",
+  databaseURL: "https://derbysportsbook-default-rtdb.firebaseio.com",
+  projectId: "derbysportsbook",
+  storageBucket: "derbysportsbook.firebasestorage.app",
+  messagingSenderId: "825986100074",
+  appId: "1:825986100074:web:55bcc5eb8c72fdb0789313"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+// Set your own email(s) here to get Admin tab access
+const ADMIN_EMAILS = ["karlosperandio@gmail.com"];
+
+// Optional: paste a free The Odds API key here to enable "Refresh Odds" for
+// World Cup / MLB / UFC. Sign up free at https://the-odds-api.com
+const ODDS_API_KEY = "";
+
+// When true (default), game/moneyline bets settle automatically the instant a
+// final score comes back from the odds API — no admin click needed. Prop bets
+// and fish catches always stay manual regardless of this setting, since there's
+// no automated way to judge those. Flip off from the Admin tab if you'd rather
+// review every game result yourself before payouts go out.
+let AUTO_SETTLE_GAMES = true;
+
+/* =========================================================
+   EVENT SEED DATA
+   Structure: EVENTS[day][sport] = array of events
+   day keys: 2026-07-09 .. 2026-07-12
+   Fill in / edit real matchups as they're confirmed (Admin tab
+   also lets you add these live without touching code).
+   ========================================================= */
+// Generates a "method & round" prop market for an MMA fight — lets a user pick
+// a specific, longer-odds outcome (e.g. "Holloway by Submission — Rd 2") instead
+// of the plain moneyline, for a bigger credit payout if it hits.
+// Odds below are placeholders — refresh/edit them once real fight odds are posted.
+function methodRoundOptions(fighterA, favA, fighterB, favB, rounds){
+  const opts = [];
+  [[fighterA,favA],[fighterB,favB]].forEach(([fighter,isFav])=>{
+    for(let r=1;r<=rounds;r++){
+      opts.push({label:`${fighter} by KO/TKO — Rd ${r}`, odds: isFav ? 450+r*100 : 650+r*150});
+      opts.push({label:`${fighter} by Submission — Rd ${r}`, odds: isFav ? 500+r*100 : 700+r*150});
+    }
+    opts.push({label:`${fighter} by Decision`, odds: isFav ? 220 : 350});
+  });
+  return opts;
+}
+function mmaFight(id, time, fighterA, oddsA, fighterB, oddsB, rounds){
+  return { id, title:`${fighterA} vs. ${fighterB}`, teams:[fighterA,fighterB], time, odds:{home:oddsA, away:oddsB},
+    props:[{ id:id+"_mr", q:"Method & round of victory", options: methodRoundOptions(fighterA, oddsA<0, fighterB, oddsB<0, rounds) }]
+  };
+}
+
+let EVENTS = {
+  "2026-07-09": {
+    "World Cup": [
+      { id:"wc_qf1", title:"Quarterfinal 1", teams:["TBD","TBD"], time:"2026-07-09T16:00:00-04:00",
+        odds:{home:-110, away:-110, draw:240}, props:[
+          { id:"wc_qf1_ot", q:"Match decided in extra time or penalties?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
+          { id:"wc_qf1_gt3", q:"Total goals over/under 2.5", options:[{label:"Over 2.5",odds:-105},{label:"Under 2.5",odds:-115}] }
+        ]},
+      { id:"wc_qf2", title:"Quarterfinal 2", teams:["TBD","TBD"], time:"2026-07-09T20:00:00-04:00",
+        odds:{home:-130, away:220, draw:250}, props:[
+          { id:"wc_qf2_bts", q:"Both teams to score?", options:[{label:"Yes",odds:-120},{label:"No",odds:100}] }
+        ]}
+    ],
+    "Wimbledon": [
+      { id:"wim_w_semi1", title:"Women's Semifinal 1", teams:["TBD","TBD"], time:"2026-07-09T08:30:00-04:00",
+        odds:{home:-140, away:120}, props:[
+          { id:"wim_w_semi1_sets", q:"Match goes 3 sets?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] }
+        ]},
+      { id:"wim_w_semi2", title:"Women's Semifinal 2", teams:["TBD","TBD"], time:"2026-07-09T10:30:00-04:00",
+        odds:{home:130, away:-150}, props:[]}
+    ]
+  },
+  "2026-07-10": {
+    "World Cup": [
+      { id:"wc_qf3", title:"Quarterfinal 3", teams:["TBD","TBD"], time:"2026-07-10T16:00:00-04:00",
+        odds:{home:150, away:-170, draw:245}, props:[]},
+      { id:"wc_qf4", title:"Quarterfinal 4", teams:["TBD","TBD"], time:"2026-07-10T20:00:00-04:00",
+        odds:{home:-140, away:280, draw:260}, props:[]}
+    ],
+    "Wimbledon": [
+      { id:"wim_m_semi1", title:"Men's Semifinal 1", teams:["TBD","TBD"], time:"2026-07-10T08:30:00-04:00",
+        odds:{home:-160, away:135}, props:[
+          { id:"wim_m_semi1_sets", q:"Match goes 5 sets?", options:[{label:"Yes",odds:170},{label:"No",odds:-200}] }
+        ]},
+      { id:"wim_m_semi2", title:"Men's Semifinal 2", teams:["TBD","TBD"], time:"2026-07-10T10:30:00-04:00",
+        odds:{home:110, away:-130}, props:[]}
+    ],
+    "MLB": [
+      { id:"mlb_jul10_1", title:"MLB Game — set via Admin", teams:["TBD","TBD"], time:"2026-07-10T19:07:00-04:00",
+        odds:{home:-115, away:-105}, props:[]}
+    ]
+  },
+  "2026-07-11": {
+    "Wimbledon": [
+      { id:"wim_womens_final", title:"Women's Singles Final", teams:["TBD","TBD"], time:"2026-07-11T09:00:00-04:00",
+        odds:{home:-150, away:130}, props:[
+          { id:"wim_w_sets", q:"Match goes to 3 sets?", options:[{label:"Yes",odds:145},{label:"No",odds:-175}] }
+        ]}
+    ],
+    "MLB": [
+      { id:"mlb_dodgers_ari_1", title:"Arizona Diamondbacks @ LA Dodgers", teams:["Diamondbacks","Dodgers"], time:"2026-07-11T21:10:00-04:00",
+        odds:{home:-165, away:145}, props:[]}
+    ],
+    "UFC 329 — Early Prelims (5pm ET)": [
+      mmaFight("ufc_ep1","2026-07-11T17:00:00-04:00","Tracy Cortez",-135,"Cong Wang",115,3),
+      mmaFight("ufc_ep2","2026-07-11T17:00:00-04:00","Cesar Almeida",-180,"Damian Pinas",155,3),
+      mmaFight("ufc_ep3","2026-07-11T17:00:00-04:00","Farid Basharat",-220,"Ethyn Ewing",180,3),
+      mmaFight("ufc_ep4","2026-07-11T17:00:00-04:00","Ryan Gandra",-115,"Zach Reese",-105,3),
+      mmaFight("ufc_ep5","2026-07-11T17:00:00-04:00","Alessandro Costa",130,"Cody Durden",-150,3)
+    ],
+    "UFC 329 — Prelims (7pm ET)": [
+      mmaFight("ufc_p1","2026-07-11T19:00:00-04:00","Robert Whittaker",-190,"Nikita Krylov",160,3),
+      mmaFight("ufc_p2","2026-07-11T19:00:00-04:00","Gable Steveson",-250,"Elisha Ellison",200,3),
+      mmaFight("ufc_p3","2026-07-11T19:00:00-04:00","Cody Garbrandt",140,"Adrian Yanez",-165,3),
+      mmaFight("ufc_p4","2026-07-11T19:00:00-04:00","Kai Kamaka III",-120,"Luke Riley",100,3)
+    ],
+    "UFC 329 — Main Card (9pm ET)": [
+      mmaFight("ufc_main","2026-07-11T21:00:00-04:00","Max Holloway",-160,"Conor McGregor",135,5),
+      mmaFight("ufc_comain","2026-07-11T21:00:00-04:00","Paddy Pimblett",-135,"Benoit Saint-Denis",115,3),
+      mmaFight("ufc_m3","2026-07-11T21:00:00-04:00","Cory Sandhagen",-145,"Mario Bautista",125,3),
+      mmaFight("ufc_m4","2026-07-11T21:00:00-04:00","Brandon Royval",-110,"Lone'er Kavanagh",-110,3),
+      mmaFight("ufc_m5","2026-07-11T21:00:00-04:00","Bobby Green",105,"Terrance McKinney",-125,3)
+    ]
+  },
+  "2026-07-12": {
+    "Wimbledon": [
+      { id:"wim_mens_final", title:"Men's Singles Final", teams:["TBD","TBD"], time:"2026-07-12T09:00:00-04:00",
+        odds:{home:-140, away:120}, props:[
+          { id:"wim_m_sets", q:"Match goes 5 sets?", options:[{label:"Yes",odds:160},{label:"No",odds:-190}] }
+        ]}
+    ],
+    "MLB": [
+      { id:"mlb_dodgers_ari_2", title:"Arizona Diamondbacks @ LA Dodgers", teams:["Diamondbacks","Dodgers"], time:"2026-07-12T16:10:00-04:00",
+        odds:{home:-155, away:135}, props:[]},
+      { id:"mlb_jays_jul12", title:"Blue Jays — set via Admin", teams:["TBD","TBD"], time:"2026-07-12T17:00:00-04:00",
+        odds:{home:-110, away:-110}, props:[]}
+    ]
+  }
+};
+
+const DAY_LABELS = {
+  "2026-07-09":"Thu Jul 9", "2026-07-10":"Fri Jul 10",
+  "2026-07-11":"Sat Jul 11", "2026-07-12":"Sun Jul 12"
+};
+
+/* =========================================================
+   STATE
+   ========================================================= */
+let currentUser = null;
+let userCredits = 100;
+let userIsAdmin = false;
+let currentView = "leaderboard";
+let currentDay = "2026-07-09";
+let currentDerbyTab = "leaderboard"; // leaderboard | log | mine
+let slip = []; // {eventId, day, sport, eventTitle, pickType:'game'|'prop', propId?, label, americanOdds}
+let allUsers = {};
+let allBets = {};
+let allCatches = {};
+
+/* =========================================================
+   AUTH
+   ========================================================= */
+function signIn(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(e=>toast("Sign-in failed: "+e.message));
+}
+function signOutUser(){ auth.signOut(); }
+
+auth.onAuthStateChanged(async user=>{
+  if(user){
+    currentUser = user;
+    userIsAdmin = ADMIN_EMAILS.map(e=>e.toLowerCase()).includes((user.email||"").toLowerCase());
+
+    // Invite-only gate: admin manages this list live from the Admin tab (stored in
+    // Firebase, no redeploy needed). An empty list means anyone with a Google
+    // account can join — set at least one email (yours) to close the pool.
+    const allowSnap = await db.ref("allowedEmails").get();
+    const allowList = Object.values(allowSnap.val()||{}).map(e=>String(e).toLowerCase());
+    const isAllowed = userIsAdmin || allowList.length===0 || allowList.includes((user.email||"").toLowerCase());
+    if(!isAllowed){
+      document.getElementById("loginScreen").classList.add("hidden");
+      document.getElementById("app").classList.add("hidden");
+      document.getElementById("notInvitedScreen").classList.remove("hidden");
+      return;
+    }
+    document.getElementById("notInvitedScreen").classList.add("hidden");
+    document.getElementById("loginScreen").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    if(userIsAdmin) document.getElementById("adminNavBtn").classList.remove("hidden");
+
+    const userRef = db.ref("users/"+user.uid);
+    const snap = await userRef.get();
+    if(!snap.exists()){
+      await userRef.set({ name:user.displayName||user.email, email:user.email, credits:100 });
+      openNameModal(user.displayName||""); // let them pick their own name right away
+    }
+
+    userRef.on("value", s=>{
+      const d = s.val();
+      if(d){
+        userCredits = d.credits;
+        document.getElementById("creditsDisplay").textContent = userCredits;
+        document.getElementById("userName").textContent = d.name || user.displayName || user.email;
+        renderView();
+      }
+    });
+
+    db.ref("users").on("value", s=>{ allUsers = s.val()||{}; if(currentView==="leaderboard") renderView(); });
+    db.ref("bets/"+user.uid).on("value", s=>{ allBets = s.val()||{}; if(currentView==="mybets") renderView(); });
+    db.ref("catches").on("value", s=>{ allCatches = s.val()||{}; if(currentView==="derby"||currentView==="admin"||currentView==="leaderboard") renderView(); });
+
+    startAutoOddsRefresh();
+  } else {
+    document.getElementById("loginScreen").classList.remove("hidden");
+    document.getElementById("app").classList.add("hidden");
+    document.getElementById("notInvitedScreen").classList.add("hidden");
+  }
+});
+
+/* ---------- Display name modal ---------- */
+function openNameModal(defaultVal){
+  document.getElementById("nameModalInput").value = defaultVal||"";
+  document.getElementById("nameModalBackdrop").classList.add("open");
+  document.getElementById("nameModal").style.display = "block";
+}
+function closeNameModal(){
+  document.getElementById("nameModalBackdrop").classList.remove("open");
+  document.getElementById("nameModal").style.display = "none";
+}
+async function saveNameFromModal(){
+  const val = document.getElementById("nameModalInput").value.trim();
+  if(!val) return;
+  await db.ref("users/"+currentUser.uid+"/name").set(val);
+  document.getElementById("userName").textContent = val;
+  closeNameModal();
+}
+function promptRename(){
+  openNameModal(document.getElementById("userName").textContent);
+}
+
+/* =========================================================
+   NAV
+   ========================================================= */
+document.getElementById("mainNav").addEventListener("click", e=>{
+  const btn = e.target.closest("button[data-view]");
+  if(!btn) return;
+  switchView(btn.dataset.view);
+});
+
+/* =========================================================
+   UI HELPERS: toast, sticky offset sync, swipe navigation
+   ========================================================= */
+let _toastTimer=null;
+function toast(msg, ms=2200){
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=> el.classList.add("hidden"), ms);
+}
+function syncStickyOffset(){
+  const topBar = document.getElementById("topBar");
+  if(!topBar) return;
+  const h = topBar.offsetHeight;
+  document.querySelectorAll(".daytabs").forEach(d=> d.style.top = h+"px");
+}
+window.addEventListener("resize", syncStickyOffset);
+
+const SWIPE_ORDER = ["leaderboard","derby","mybets","games","props"]; // admin excluded from swipe, nav-tap only
+let _touchStartX=null, _touchStartY=null;
+function initSwipe(){
+  const area = document.getElementById("swipeArea");
+  area.addEventListener("touchstart", e=>{
+    _touchStartX = e.touches[0].clientX;
+    _touchStartY = e.touches[0].clientY;
+  }, {passive:true});
+  area.addEventListener("touchend", e=>{
+    if(_touchStartX===null) return;
+    const dx = e.changedTouches[0].clientX - _touchStartX;
+    const dy = e.changedTouches[0].clientY - _touchStartY;
+    _touchStartX=null;
+    if(Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)*1.3) return; // require a mostly-horizontal, deliberate swipe
+    const order = userIsAdmin ? [...SWIPE_ORDER,"admin"] : SWIPE_ORDER;
+    const idx = order.indexOf(currentView);
+    if(idx===-1) return;
+    let nextIdx = dx < 0 ? idx+1 : idx-1;
+    if(nextIdx<0 || nextIdx>=order.length) return;
+    switchView(order[nextIdx]);
+  }, {passive:true});
+}
+function switchView(view){
+  currentView = view;
+  document.querySelectorAll("#mainNav button").forEach(b=> b.classList.toggle("active", b.dataset.view===view));
+  renderView();
+  window.scrollTo(0,0);
+}
+initSwipe();
+
+function liveScoreBadge(ev){
+  if(!ev.liveScore) return "";
+  const s = ev.liveScore;
+  const hasScore = s.home!==undefined && s.away!==undefined && s.home!==null && s.away!==null;
+  const label = s.completed ? "FINAL" : "🔴 LIVE";
+  const color = s.completed ? "var(--win)" : "var(--accent2)";
+  const scoreText = hasScore ? `${ev.teams[0]} ${s.home} – ${s.away} ${ev.teams[1]}` : "";
+  return `<div style="font-size:.75rem;color:${color};margin:-4px 0 8px;font-weight:600;">${label}${scoreText?" · "+scoreText:""}</div>`;
+}
+
+function oddsDecimal(american){
+  return american>0 ? 1+(american/100) : 1+(100/Math.abs(american));
+}
+function fmtOdds(american){
+  return (american>0? "+":"") + american;
+}
+function isLocked(event){
+  return new Date() >= new Date(event.time);
+}
+function fmtTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit',timeZoneName:'short'});
+}
+
+/* =========================================================
+   RENDER: ROUTER
+   ========================================================= */
+function renderView(){
+  const main = document.getElementById("main");
+  if(currentView==="leaderboard") renderLeaderboard(main);
+  else if(currentView==="games") renderBettingView(main,false);
+  else if(currentView==="props") renderBettingView(main,true);
+  else if(currentView==="mybets") renderMyBets(main);
+  else if(currentView==="derby") renderDerby(main);
+  else if(currentView==="admin") renderAdmin(main);
+  requestAnimationFrame(syncStickyOffset);
+}
+
+/* ---------- LEADERBOARD (home) ---------- */
+function getDerbyPointsForUser(uid){
+  const catches = allCatches[uid] || {};
+  return Object.values(catches).reduce((sum,c)=> c.status==="approved" ? sum + calcCatchPoints(c.type,c.length) : sum, 0);
+}
+
+function renderLeaderboard(main){
+  document.getElementById("slipFab").classList.add("hidden");
+  const DERBY_WEIGHT = 0.8, BETTING_WEIGHT = 0.2;
+  const arr = Object.entries(allUsers).map(([uid,u])=>{
+    const derbyPts = getDerbyPointsForUser(uid);
+    const credits = u.credits ?? 100;
+    const total = (derbyPts*DERBY_WEIGHT) + (credits*BETTING_WEIGHT);
+    return { uid, name:u.name||u.email, derbyPts, credits, total };
+  });
+  arr.sort((a,b)=> b.total - a.total);
+  let rows = arr.map((u,i)=>`
+    <tr>
+      <td class="${i===0?'rank1':''}">${i+1}${i===0?' 👑':''}</td>
+      <td>${u.name}</td>
+      <td style="text-align:right;color:var(--muted);">${u.derbyPts.toFixed(1)}</td>
+      <td style="text-align:right;color:var(--muted);">${u.credits.toFixed(0)}</td>
+      <td style="text-align:right;">${u.total.toFixed(1)}</td>
+    </tr>`).join("");
+  main.innerHTML = `
+    <div class="card">
+      <h3 style="margin-top:0;">🏆 Leaderboard</h3>
+      <p style="color:var(--muted);font-size:.8rem;margin-top:-6px;">Total = (Derby points × 80%) + (Betting credits × 20%). All bets lock before each event's start time; catches count once admin-verified.</p>
+      <table><tr><th>#</th><th>Player</th><th style="text-align:right;">Derby</th><th style="text-align:right;">Betting</th><th style="text-align:right;">Total</th></tr>${rows || '<tr><td colspan="5" class="empty">No players yet</td></tr>'}</table>
+    </div>
+    <div class="card" style="text-align:center;color:var(--muted);font-size:.8rem;">
+      Signed in as ${currentUser.email} · <span style="text-decoration:underline;cursor:pointer;" onclick="signOutUser()">Sign out</span>
+    </div>
+  `;
+}
+
+/* ---------- GAME BETS / PROP BETS ---------- */
+function renderBettingView(main, propsOnly){
+  document.getElementById("slipFab").classList.remove("hidden");
+  updateSlipFab();
+
+  let dayTabs = Object.keys(EVENTS).map(day=>`
+    <button class="${day===currentDay?'active':''}" onclick="setDay('${day}')">${DAY_LABELS[day]}</button>
+  `).join("");
+
+  let sportsHtml = "";
+  const daySports = EVENTS[currentDay] || {};
+  for(const sport in daySports){
+    const events = daySports[sport];
+    let eventsHtml = events.map(ev=>{
+      const locked = isLocked(ev);
+      if(!propsOnly){
+        // GAME RESULT PICKS
+        if(ev.isOutright) return ""; // outrights only show in props view
+        const homeSel = slip.some(l=>l.eventId===ev.id && l.pick==="home");
+        const awaySel = slip.some(l=>l.eventId===ev.id && l.pick==="away");
+        const drawBtn = ev.odds.draw ? `
+          <div class="pickbtn ${locked?'disabled':''} ${slip.some(l=>l.eventId===ev.id&&l.pick==='draw')?'selected':''}"
+               onclick="togglePick('${ev.id}','${sport}','${currentDay}','${ev.title.replace(/'/g,"\\'")}','game','draw','Draw',${ev.odds.draw})">
+            <div class="side">Draw</div><div class="odds">${fmtOdds(ev.odds.draw)}</div>
+          </div>` : "";
+        return `
+          <div class="event">
+            <div class="event-title">${ev.title}${locked?'<span class="locked-badge">LOCKED</span>':''}</div>
+            <div class="event-time">${ev.teams[0]} vs ${ev.teams[1]} · ${fmtTime(ev.time)}</div>
+            ${liveScoreBadge(ev)}
+            <div class="pickrow">
+              <div class="pickbtn ${locked?'disabled':''} ${homeSel?'selected':''}"
+                   onclick="togglePick('${ev.id}','${sport}','${currentDay}','${ev.title.replace(/'/g,"\\'")}','game','home','${ev.teams[0].replace(/'/g,"\\'")}',${ev.odds.home})">
+                <div class="side">${ev.teams[0]}</div><div class="odds">${fmtOdds(ev.odds.home)}</div>
+              </div>
+              ${drawBtn}
+              <div class="pickbtn ${locked?'disabled':''} ${awaySel?'selected':''}"
+                   onclick="togglePick('${ev.id}','${sport}','${currentDay}','${ev.title.replace(/'/g,"\\'")}','game','away','${ev.teams[1].replace(/'/g,"\\'")}',${ev.odds.away})">
+                <div class="side">${ev.teams[1]}</div><div class="odds">${fmtOdds(ev.odds.away)}</div>
+              </div>
+            </div>
+          </div>`;
+      } else {
+        // PROP BETS
+        if(!ev.props || ev.props.length===0) return "";
+        const propsHtml = ev.props.map(p=>{
+          const optsHtml = (p.options||[]).map(o=>{
+            const sel = slip.some(l=>l.eventId===ev.id && l.propId===p.id && l.label===o.label);
+            return `<div class="pickbtn ${locked?'disabled':''} ${sel?'selected':''}"
+                 onclick="togglePick('${ev.id}','${sport}','${currentDay}','${(ev.title+' — '+p.q).replace(/'/g,"\\'")}','prop','${p.id}','${o.label.replace(/'/g,"\\'")}',${o.odds},'${p.id}')">
+              <div class="side">${o.label}</div><div class="odds">${fmtOdds(o.odds)}</div>
+            </div>`;
+          }).join("");
+          return `<div style="margin-bottom:14px;">
+            <div class="prop-q">${p.q}${locked?'<span class="locked-badge">LOCKED</span>':''}</div>
+            <div class="prop-options">${optsHtml || '<span style="color:var(--muted);font-size:.8rem;">No options set yet — add via Admin</span>'}</div>
+          </div>`;
+        }).join("");
+        return `<div class="event"><div class="event-title">${ev.title}</div><div class="event-time">${fmtTime(ev.time)}</div>${liveScoreBadge(ev)}${propsHtml}</div>`;
+      }
+    }).join("");
+    if(eventsHtml.trim()) sportsHtml += `<div class="sport-header">${sport}</div>${eventsHtml}`;
+  }
+
+  main.innerHTML = `
+    <div class="daytabs">${dayTabs}</div>
+    ${sportsHtml || '<div class="empty">Nothing to show for this day yet.</div>'}
+  `;
+}
+function setDay(day){ currentDay = day; renderView(); window.scrollTo(0,0); }
+
+function togglePick(eventId, sport, day, eventTitle, pickType, pickKey, label, americanOdds, propId){
+  const idx = slip.findIndex(l=> l.eventId===eventId && (pickType==='prop' ? l.propId===propId : true) );
+  // For game bets: only one pick per event allowed. For prop bets: one pick per prop question.
+  const existingIdx = slip.findIndex(l => l.eventId===eventId && ((pickType==='prop' && l.propId===propId) || (pickType==='game' && l.pickType==='game')));
+  if(existingIdx>-1){
+    if(slip[existingIdx].label===label){ slip.splice(existingIdx,1); updateSlipFab(); renderView(); return; }
+    slip.splice(existingIdx,1);
+  }
+  slip.push({eventId, sport, day, eventTitle, pickType, pick:pickKey, propId, label, americanOdds:Number(americanOdds)});
+  updateSlipFab();
+  renderView();
+}
+
+function updateSlipFab(){
+  const fab = document.getElementById("slipFab");
+  if(slip.length===0){
+    fab.innerHTML = `🎟 Bet Slip <span class="count" id="slipCount">0</span>`;
+    return;
+  }
+  let combined = 1;
+  slip.forEach(l=> combined *= oddsDecimal(l.americanOdds));
+  fab.innerHTML = `🎟 Bet Slip <span class="count" id="slipCount">${slip.length}</span>`
+    + (slip.length>1 ? ` &nbsp;·&nbsp; ${combined.toFixed(2)}x` : ``);
+}
+
+/* ---------- BET SLIP MODAL ---------- */
+function openSlip(){
+  document.getElementById("modalBackdrop").classList.add("open");
+  document.getElementById("slipModal").style.display = "block";
+  renderSlip();
+}
+function closeSlip(){
+  document.getElementById("modalBackdrop").classList.remove("open");
+  document.getElementById("slipModal").style.display = "none";
+}
+function removeLeg(i){ slip.splice(i,1); updateSlipFab(); renderSlip(); renderView(); }
+
+function renderSlip(){
+  const legsDiv = document.getElementById("slipLegs");
+  const empty = document.getElementById("slipEmpty");
+  const controls = document.getElementById("slipControls");
+  const betType = document.getElementById("betTypeSelect");
+
+  if(slip.length===0){
+    legsDiv.innerHTML = "";
+    empty.classList.remove("hidden");
+    controls.classList.add("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  controls.classList.remove("hidden");
+
+  let running = 1;
+  legsDiv.innerHTML = slip.map((l,i)=>{
+    running *= oddsDecimal(l.americanOdds);
+    const runningTag = slip.length>1
+      ? `<br><span style="font-size:.7rem;color:var(--accent2);">combined odds so far: ${running.toFixed(2)}x</span>`
+      : "";
+    return `
+    <div class="leg">
+      <span>${l.eventTitle}<br><b>${l.label}</b> (${fmtOdds(l.americanOdds)})${runningTag}</span>
+      <span class="x" onclick="removeLeg(${i})">✕</span>
+    </div>
+  `;
+  }).join("");
+
+  // bet type options
+  betType.innerHTML = slip.length===1
+    ? `<option value="single">Single Bet</option>`
+    : `<option value="parlay">Parlay (all ${slip.length} legs, combined odds)</option><option value="single">Place as separate single bets</option>`;
+
+  const stakeInput = document.getElementById("stakeInput");
+  const stake = Number(stakeInput.value)||0;
+  const mode = betType.value;
+
+  let combinedDecimal = 1;
+  slip.forEach(l=> combinedDecimal *= oddsDecimal(l.americanOdds));
+
+  document.getElementById("availBal").textContent = userCredits.toFixed(0)+" credits";
+
+  if(mode==="parlay"){
+    document.getElementById("combOdds").textContent = combinedDecimal.toFixed(2)+"x";
+    document.getElementById("toWin").textContent = stake>0 ? (stake*combinedDecimal - stake).toFixed(0)+" credits" : "—";
+  } else {
+    document.getElementById("combOdds").textContent = "individual";
+    const totalToWin = slip.reduce((sum,l)=> sum + (stake>0 ? stake*oddsDecimal(l.americanOdds)-stake : 0), 0);
+    document.getElementById("toWin").textContent = stake>0 ? totalToWin.toFixed(0)+" credits total (if all win)" : "—";
+  }
+
+  const totalStakeNeeded = mode==="parlay" ? stake : stake*slip.length;
+  document.getElementById("placeBtn").disabled = !(stake>0 && totalStakeNeeded<=userCredits);
+}
+
+function getCurrentOddsForLeg(l){
+  const ev = findEvent(l.eventId);
+  if(!ev) return null;
+  if(l.pickType==="game") return ev.odds[l.pick] ?? null;
+  const prop = (ev.props||[]).find(p=>p.id===l.propId);
+  const opt = prop?.options.find(o=>o.label===l.label);
+  return opt ? opt.odds : null;
+}
+
+async function placeBet(){
+  const stake = Number(document.getElementById("stakeInput").value)||0;
+  const mode = document.getElementById("betTypeSelect").value;
+  if(stake<=0) return;
+
+  // re-check lock status at placement time
+  for(const l of slip){
+    const ev = findEvent(l.eventId);
+    if(ev && isLocked(ev)){ toast(`"${ev.title}" has already started — remove it from your slip.`); return; }
+  }
+
+  // odds refresh in the background continuously — re-verify against the live board
+  // right before confirming, so payouts are always calculated on the freshest number.
+  let oddsChanged = false;
+  slip.forEach(l=>{
+    const live = getCurrentOddsForLeg(l);
+    if(live!==null && live!==l.americanOdds){ l.americanOdds = live; oddsChanged = true; }
+  });
+  if(oddsChanged){
+    renderSlip();
+    toast("Odds just moved — slip updated. Review and tap Place Bet again to confirm.");
+    return;
+  }
+
+  const totalStakeNeeded = mode==="parlay" ? stake : stake*slip.length;
+  if(totalStakeNeeded > userCredits){ toast("Not enough credits."); return; }
+
+  const betsRef = db.ref("bets/"+currentUser.uid);
+  const userRef = db.ref("users/"+currentUser.uid);
+
+  if(mode==="parlay"){
+    await betsRef.push({
+      type:"parlay", legs:slip, stake, placedAt:Date.now(), status:"pending"
+    });
+  } else {
+    for(const l of slip){
+      await betsRef.push({ type:"single", legs:[l], stake, placedAt:Date.now(), status:"pending" });
+    }
+  }
+  await userRef.child("credits").set(userCredits - totalStakeNeeded);
+
+  slip = [];
+  updateSlipFab();
+  closeSlip();
+  renderView();
+  toast("Bet placed! Good luck. 🍀");
+}
+
+function findEvent(eventId){
+  for(const day in EVENTS){ for(const sport in EVENTS[day]){
+    const found = EVENTS[day][sport].find(e=>e.id===eventId);
+    if(found) return found;
+  }}
+  return null;
+}
+
+/* ---------- MY BETS ---------- */
+function renderMyBets(main){
+  document.getElementById("slipFab").classList.remove("hidden");
+  updateSlipFab();
+  const arr = Object.entries(allBets||{}).map(([id,b])=>({id,...b})).sort((a,b)=>b.placedAt-a.placedAt);
+  if(arr.length===0){ main.innerHTML = '<div class="card empty">No bets placed yet. Head to Game Bets or Prop Bets to get started.</div>'; return; }
+
+  main.innerHTML = arr.map(b=>{
+    const legsHtml = b.legs.map(l=>`<div style="font-size:.8rem;color:var(--muted);">${l.eventTitle} — <b style="color:var(--text);">${l.label}</b> (${fmtOdds(l.americanOdds)})</div>`).join("");
+    let statusHtml = `<span style="color:var(--muted);">Pending</span>`;
+    if(b.status==="won") statusHtml = `<span class="badge-win">Won +${b.payout?.toFixed(0)}</span>`;
+    if(b.status==="lost") statusHtml = `<span class="badge-lose">Lost -${b.stake}</span>`;
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;">
+        <b>${b.type==='parlay'?'Parlay':'Single'} · ${b.stake} credits</b>
+        ${statusHtml}
+      </div>
+      <div style="margin-top:8px;">${legsHtml}</div>
+    </div>`;
+  }).join("");
+}
+
+/* ---------- FISH DERBY ---------- */
+const FISH_POINTS = { Bass:3, Pike:1, Walleye:5 }; // base points per fish type
+// Total points per catch = length in inches + the fish's type base points.
+// e.g. an 18" Bass = 18 + 3 = 21 pts. A 24" Walleye = 24 + 5 = 29 pts.
+function calcCatchPoints(type, length){
+  return (Number(length)||0) + (FISH_POINTS[type]||0);
+}
+let _pendingCatchPhoto = null;
+
+function renderDerby(main){
+  document.getElementById("slipFab").classList.add("hidden");
+  const tabs = [["leaderboard","Derby Board"],["log","Log a Catch"],["mine","My Catches"]];
+  const tabsHtml = tabs.map(([key,label])=>
+    `<button class="${key===currentDerbyTab?'active':''}" onclick="setDerbyTab('${key}')">${label}</button>`
+  ).join("");
+
+  let body = "";
+  if(currentDerbyTab==="leaderboard") body = renderDerbyLeaderboardHtml();
+  else if(currentDerbyTab==="log") body = renderLogCatchHtml();
+  else body = renderMyCatchesHtml();
+
+  main.innerHTML = `<div class="subtabs">${tabsHtml}</div>${body}`;
+
+  const fileInput = document.getElementById("catchPhotoInput");
+  if(fileInput) fileInput.addEventListener("change", handlePhotoSelect);
+}
+function setDerbyTab(t){ currentDerbyTab = t; _pendingCatchPhoto = null; renderView(); window.scrollTo(0,0); }
+
+function renderDerbyLeaderboardHtml(){
+  const totals = {};
+  Object.entries(allCatches).forEach(([uid,catches])=>{
+    Object.values(catches||{}).forEach(c=>{
+      if(c.status!=="approved") return;
+      if(!totals[uid]) totals[uid] = { points:0, totalLength:0, counts:{Bass:0,Pike:0,Walleye:0} };
+      totals[uid].points += calcCatchPoints(c.type, c.length);
+      totals[uid].totalLength += Number(c.length)||0;
+      totals[uid].counts[c.type] = (totals[uid].counts[c.type]||0)+1;
+    });
+  });
+  const arr = Object.entries(totals).map(([uid,t])=>({uid, name:(allUsers[uid]&&allUsers[uid].name)||"Angler", ...t}));
+  arr.sort((a,b)=>b.points-a.points);
+  const rows = arr.map((u,i)=>`
+    <tr>
+      <td class="${i===0?'rank1':''}">${i+1}${i===0?' 🎣':''}</td>
+      <td>${u.name}</td>
+      <td style="font-size:.7rem;color:var(--muted);">${u.counts.Walleye}🟡 ${u.counts.Bass}🟢 ${u.counts.Pike}⚪</td>
+      <td style="text-align:right;color:var(--muted);">${u.totalLength.toFixed(1)}"</td>
+      <td style="text-align:right;">${u.points.toFixed(1)} pts</td>
+    </tr>`).join("");
+  return `
+    <div class="card">
+      <h3 style="margin-top:0;">🎣 Derby Standings</h3>
+      <p style="color:var(--muted);font-size:.8rem;margin-top:-6px;">Points = length (inches) + type bonus — Walleye +5, Bass +3, Pike +1. Only admin-verified catches count.</p>
+      <table><tr><th>#</th><th>Angler</th><th>Fish</th><th style="text-align:right;">Length</th><th style="text-align:right;">Total</th></tr>${rows || '<tr><td colspan="5" class="empty">No verified catches yet</td></tr>'}</table>
+    </div>`;
+}
+
+function renderLogCatchHtml(){
+  return `
+    <div class="card adminbox">
+      <h3 style="margin-top:0;">Log a Catch</h3>
+      <label>Fish type</label>
+      <select id="catchType">
+        <option value="Bass">Bass — length + 3</option>
+        <option value="Pike">Pike — length + 1</option>
+        <option value="Walleye">Walleye — length + 5</option>
+      </select>
+      <label>Length (inches)</label>
+      <input id="catchLength" type="number" step="0.1" min="1" placeholder="e.g. 18.5">
+      <label>Photo of the fish (required — this is how it gets verified)</label>
+      <input id="catchPhotoInput" type="file" accept="image/*">
+      <div id="catchPhotoPreview" style="margin:10px 0;"></div>
+      <button class="btn" onclick="submitCatch()">Submit for Verification</button>
+      <p style="font-size:.75rem;color:var(--muted);margin-top:10px;">This won't count on the Derby Board until an admin checks the photo and length. Track its status under "My Catches."</p>
+    </div>`;
+}
+
+function handlePhotoSelect(e){
+  try{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const preview = document.getElementById("catchPhotoPreview");
+    if(preview) preview.innerHTML = `<p style="color:var(--muted);font-size:.8rem;">Processing photo…</p>`;
+    const reader = new FileReader();
+    reader.onerror = ()=> toast("Couldn't read that photo — try a different one.");
+    reader.onload = ev=>{
+      const img = new Image();
+      img.onerror = ()=> toast("Couldn't load that image — try a different photo.");
+      img.onload = ()=>{
+        try{
+          const maxW = 900;
+          const scale = Math.min(1, maxW/img.width);
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width*scale) || img.width;
+          canvas.height = Math.round(img.height*scale) || img.height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img,0,0,canvas.width,canvas.height);
+          _pendingCatchPhoto = canvas.toDataURL("image/jpeg",0.7);
+          const p2 = document.getElementById("catchPhotoPreview");
+          if(p2) p2.innerHTML = `<img src="${_pendingCatchPhoto}" style="max-width:100%;border-radius:10px;">`;
+        }catch(err){
+          console.error("Photo processing failed", err);
+          toast("Something went wrong processing that photo.");
+        }
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }catch(err){
+    console.error("handlePhotoSelect failed", err);
+    toast("Something went wrong selecting that photo.");
+  }
+}
+
+async function submitCatch(){
+  const type = document.getElementById("catchType").value;
+  const length = Number(document.getElementById("catchLength").value);
+  if(!length || length<=0){ toast("Enter a valid length first."); return; }
+  if(!_pendingCatchPhoto){ toast("A photo is required so this can be verified."); return; }
+  await db.ref("catches/"+currentUser.uid).push({
+    type, length, photo:_pendingCatchPhoto, submittedAt:Date.now(), status:"pending"
+  });
+  _pendingCatchPhoto = null;
+  toast("Catch submitted — waiting on verification. 🎣");
+  currentDerbyTab = "mine";
+  renderView();
+}
+
+function renderMyCatchesHtml(){
+  const mine = allCatches[currentUser.uid]||{};
+  const arr = Object.entries(mine).map(([id,c])=>({id,...c})).sort((a,b)=>b.submittedAt-a.submittedAt);
+  if(arr.length===0) return '<div class="card empty">No catches logged yet — head to "Log a Catch".</div>';
+  return arr.map(c=>{
+    let statusHtml = '<span style="color:var(--muted);">⏳ Pending verification</span>';
+    if(c.status==="approved") statusHtml = `<span class="badge-win">✅ Verified — ${calcCatchPoints(c.type,c.length).toFixed(1)} pts</span>`;
+    if(c.status==="rejected") statusHtml = `<span class="badge-lose">❌ Rejected${c.rejectReason?': '+c.rejectReason:''}</span>`;
+    return `<div class="card">
+      <div style="display:flex;gap:12px;">
+        <img src="${c.photo}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;flex-shrink:0;">
+        <div>
+          <b>${c.type}</b> — ${c.length}"<br>
+          ${statusHtml}
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderAdminCatchesHtml(){
+  let rows = "";
+  Object.entries(allCatches).forEach(([uid,catches])=>{
+    Object.entries(catches||{}).forEach(([cid,c])=>{
+      if(c.status!=="pending") return;
+      const name = (allUsers[uid]&&allUsers[uid].name)||uid;
+      const inputId = `rejectReason_${uid}_${cid}`;
+      rows += `<div class="leg" style="align-items:flex-start;height:auto;">
+        <div style="display:flex;gap:12px;width:100%;">
+          <img src="${c.photo}" style="width:74px;height:74px;object-fit:cover;border-radius:10px;flex-shrink:0;">
+          <div style="flex:1;">
+            <b>${name}</b> — ${c.type}, ${c.length}" <span style="color:var(--accent2);">(${calcCatchPoints(c.type,c.length).toFixed(1)} pts if approved)</span><br>
+            <input id="${inputId}" placeholder="Reason if rejecting (optional)" style="width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:6px 8px;border-radius:8px;font-size:.75rem;margin-top:6px;">
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <button class="btn" style="width:auto;padding:8px 14px;" onclick="verifyCatch('${uid}','${cid}',true)">Approve</button>
+              <button class="btn btn-secondary" style="width:auto;padding:8px 14px;" onclick="verifyCatch('${uid}','${cid}',false,'${inputId}')">Reject</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    });
+  });
+  return rows || '<p style="font-size:.85rem;color:var(--muted);">No catches waiting on verification.</p>';
+}
+
+async function verifyCatch(uid, cid, approve, reasonInputId){
+  if(approve){
+    await db.ref(`catches/${uid}/${cid}`).update({status:"approved"});
+    toast("Catch approved ✅");
+  } else {
+    const reason = reasonInputId ? (document.getElementById(reasonInputId)?.value || "") : "";
+    await db.ref(`catches/${uid}/${cid}`).update({status:"rejected", rejectReason:reason});
+    toast("Catch rejected");
+  }
+  renderAdmin(document.getElementById("main"));
+}
+
+/* ---------- ADMIN ---------- */
+function renderAdmin(main){
+  document.getElementById("slipFab").classList.add("hidden");
+  const allowedListHtml = (allowedEmailsCache||[]).map(e=>
+    `<div class="leg"><span>${e}</span><span class="x" onclick="removeAllowedEmail('${e}')">✕</span></div>`
+  ).join("") || '<p style="font-size:.8rem;color:var(--muted);">No list yet — anyone with a Google account can currently join.</p>';
+
+  main.innerHTML = `
+    <div class="card adminbox">
+      <h3 style="margin-top:0;">⚙️ Admin</h3>
+
+      <label>Invited players (Gmail addresses)</label>
+      <p style="font-size:.8rem;">Add emails to close the pool to just your group. Leave empty and anyone with a Google account can join. Players still pick their own display name when they first sign in — this only controls who's allowed in.</p>
+      <div style="display:flex;gap:8px;">
+        <input id="adminNewEmail" placeholder="friend@gmail.com" style="flex:1;">
+        <button class="btn" style="width:auto;padding:10px 16px;" onclick="addAllowedEmail()">Add</button>
+      </div>
+      <div style="margin-top:10px;">${allowedListHtml}</div>
+
+      <hr style="border-color:var(--line);margin:16px 0;">
+
+      <label>Odds (World Cup / MLB / UFC)</label>
+      <p style="font-size:.8rem;">Fetching automatically — on every login and every 5 minutes while the app is open. New fixtures (real matchups replacing "TBD") are auto-added as they're confirmed, and UFC method/round prop odds recompute automatically from the live moneyline. No manual entry needed for these three.</p>
+      <button class="btn btn-secondary" onclick="refreshOddsFromApi()">Force Refresh Now</button>
+      <p style="font-size:.75rem;color:var(--muted);">Requires a free API key pasted into ODDS_API_KEY in the code (the-odds-api.com, 500 requests/month free). Sports/markets outside its coverage still need the manual box below.</p>
+
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;">
+        <input type="checkbox" id="autoSettleToggle" ${AUTO_SETTLE_GAMES?'checked':''} onchange="AUTO_SETTLE_GAMES=this.checked; toast('Auto-settle games: '+(AUTO_SETTLE_GAMES?'ON':'OFF'));" style="width:auto;margin:0;">
+        <span style="color:var(--text);">Auto-settle game bets when a final score comes in</span>
+      </label>
+      <p style="font-size:.75rem;color:var(--muted);">On by default. Only applies to moneyline/game-outcome bets — prop bets and fish catches always need your manual review, there's no automated way to judge those.</p>
+
+      <hr style="border-color:var(--line);margin:16px 0;">
+
+      <label>Add / edit an event (paste JSON, matches the EVENTS structure)</label>
+      <select id="adminDay">${Object.keys(EVENTS).map(d=>`<option value="${d}">${DAY_LABELS[d]}</option>`).join("")}</select>
+      <input id="adminSport" placeholder="Sport section name, e.g. MLB">
+      <textarea id="adminEventJson" rows="6" placeholder='{"id":"mlb_new","title":"Blue Jays @ Yankees","teams":["Blue Jays","Yankees"],"time":"2026-07-11T19:07:00-04:00","odds":{"home":-120,"away":100},"props":[]}'></textarea>
+      <button class="btn" onclick="adminAddEvent()">Save Event</button>
+
+      <hr style="border-color:var(--line);margin:16px 0;">
+
+      <label>Live scores (auto-fetched, reference only — doesn't auto-settle)</label>
+      <div>${renderLiveScoresReferenceHtml()}</div>
+
+      <hr style="border-color:var(--line);margin:16px 0;">
+
+      <label>Manual settle / override (moneyline only — not props)</label>
+      <input id="adminSettleEventId" placeholder="Event ID, e.g. wc_qf1">
+      <select id="adminSettleOutcome">
+        <option value="home">Home / first team wins</option>
+        <option value="away">Away / second team wins</option>
+        <option value="draw">Draw</option>
+      </select>
+      <button class="btn" onclick="settleEvent()">Settle & Pay Out</button>
+      <p style="font-size:.75rem;color:var(--muted);">With auto-settle on, you shouldn't need this for most games — it's here as a backup for events outside the odds API's coverage, or if you want to force a result before the score feed marks it final. Only resolves game-outcome bets; props are untouched.</p>
+
+      <hr style="border-color:var(--line);margin:16px 0;">
+
+      <label>Settle a prop bet</label>
+      <input id="adminSettlePropId" placeholder="Prop ID, e.g. ufc_main_mr" oninput="loadPropOutcomeOptions()">
+      <select id="adminSettlePropOutcome"><option value="">— type a Prop ID above —</option></select>
+      <button class="btn" onclick="settlePropBet()">Settle Prop & Pay Out</button>
+      <p style="font-size:.75rem;color:var(--muted);">Type the exact Prop ID (visible in the event's data, e.g. the UFC "Method & round" markets are named "&lt;fight_id&gt;_mr"). Once it matches a known prop, its real options load into the dropdown above — pick the one that actually happened.</p>
+
+      <details style="margin-top:10px;">
+        <summary style="font-size:.8rem;color:var(--muted);cursor:pointer;">Show all Prop IDs (tap to expand)</summary>
+        <div style="margin-top:8px;">${renderPropIdsReferenceHtml()}</div>
+      </details>
+    </div>
+
+    <div class="card adminbox">
+      <h3 style="margin-top:0;">🎣 Verify Catches</h3>
+      <p style="font-size:.8rem;">Check the photo matches the claimed type and length looks plausible, then approve or reject. Approved catches count immediately on the Derby leaderboard.</p>
+      ${renderAdminCatchesHtml()}
+    </div>
+  `;
+}
+
+let allowedEmailsCache = [];
+db.ref("allowedEmails").on("value", s=>{
+  allowedEmailsCache = Object.entries(s.val()||{}).map(([k,v])=>v);
+  if(currentView==="admin") renderAdmin(document.getElementById("main"));
+});
+async function addAllowedEmail(){
+  const input = document.getElementById("adminNewEmail");
+  const email = input.value.trim().toLowerCase();
+  if(!email || !email.includes("@")) return;
+  await db.ref("allowedEmails/"+email.replace(/[.#$\[\]]/g,"_")).set(email);
+  input.value = "";
+}
+async function removeAllowedEmail(email){
+  await db.ref("allowedEmails/"+email.replace(/[.#$\[\]]/g,"_")).set(null);
+}
+
+function renderLiveScoresReferenceHtml(){
+  let rows = "";
+  for(const day in EVENTS){
+    for(const sport in EVENTS[day]){
+      EVENTS[day][sport].forEach(ev=>{
+        if(!ev.liveScore) return;
+        const s = ev.liveScore;
+        const hasScore = s.home!==undefined && s.away!==undefined && s.home!==null && s.away!==null;
+        rows += `<div class="leg">
+          <span style="font-size:.8rem;">
+            <b>${ev.id}</b> — ${ev.title}<br>
+            <span style="color:${s.completed?'var(--win)':'var(--accent2)'};">${s.completed?'FINAL':'🔴 LIVE'}</span>
+            ${hasScore ? ` ${ev.teams[0]} ${s.home} – ${s.away} ${ev.teams[1]}` : ' (no score reported yet)'}
+          </span>
+        </div>`;
+      });
+    }
+  }
+  return rows || '<p style="font-size:.8rem;color:var(--muted);">No live/final scores fetched yet — needs an ODDS_API_KEY and at least one tracked game to have started.</p>';
+}
+
+function adminAddEvent(){
+  try{
+    const day = document.getElementById("adminDay").value;
+    const sport = document.getElementById("adminSport").value.trim();
+    const ev = JSON.parse(document.getElementById("adminEventJson").value);
+    if(!EVENTS[day]) EVENTS[day] = {};
+    if(!EVENTS[day][sport]) EVENTS[day][sport] = [];
+    const existingIdx = EVENTS[day][sport].findIndex(e=>e.id===ev.id);
+    if(existingIdx>-1) EVENTS[day][sport][existingIdx] = ev; else EVENTS[day][sport].push(ev);
+    // persist to Firebase so it's shared across all users' browsers
+    db.ref("eventsOverride/"+day+"/"+sport.replace(/[.#$\[\]]/g,"_")).set(EVENTS[day][sport]);
+    toast("Event saved.");
+    renderAdmin(document.getElementById("main"));
+  }catch(e){ toast("Invalid JSON: "+e.message); }
+}
+
+// Uniquely identifies which specific market a leg is betting on. Needed because
+// a single event can have both a game-outcome market AND several prop markets —
+// without this, settling the game result could incorrectly resolve a prop leg
+// on the same event (or vice versa), since both share the same eventId.
+function legMarketKey(leg){
+  return leg.pickType==="game" ? "game:"+leg.eventId : "prop:"+leg.propId;
+}
+
+function renderPropIdsReferenceHtml(){
+  let rows = "";
+  for(const day in EVENTS){
+    for(const sport in EVENTS[day]){
+      EVENTS[day][sport].forEach(ev=>{
+        (ev.props||[]).forEach(p=>{
+          rows += `<div class="leg" style="cursor:pointer;" onclick="document.getElementById('adminSettlePropId').value='${p.id}';loadPropOutcomeOptions();this.scrollIntoView({block:'center'});">
+            <span style="font-size:.75rem;"><b>${p.id}</b><br>${ev.title} — ${p.q}</span>
+          </div>`;
+        });
+      });
+    }
+  }
+  return rows || '<p style="font-size:.8rem;color:var(--muted);">No props found.</p>';
+}
+
+function loadPropOutcomeOptions(){
+  const propId = document.getElementById("adminSettlePropId").value.trim();
+  const select = document.getElementById("adminSettlePropOutcome");
+  const found = propId ? findPropById(propId) : null;
+  if(!found){
+    select.innerHTML = `<option value="">— type a Prop ID above —</option>`;
+    return;
+  }
+  select.innerHTML = found.prop.options.map(o=>`<option value="${o.label.replace(/"/g,'&quot;')}">${o.label}</option>`).join("");
+}
+
+function findPropById(propId){
+  for(const day in EVENTS){
+    for(const sport in EVENTS[day]){
+      for(const ev of EVENTS[day][sport]){
+        const prop = (ev.props||[]).find(p=>p.id===propId);
+        if(prop) return {prop, event:ev};
+      }
+    }
+  }
+  return null;
+}
+
+// Core settlement logic, callable from the Admin button OR automatically once a
+// live score comes back completed. Safe to call more than once for the same
+// event — bets already resolved (status !== "pending") are simply skipped, so
+// re-running this after auto-settlement (or a manual click after auto already
+// ran) does nothing extra.
+async function settleGameOutcome(eventId, outcome, silent){
+  const usersSnap = await db.ref("users").get();
+  const users = usersSnap.val()||{};
+  let touched = 0;
+
+  for(const uid in users){
+    const betsSnap = await db.ref("bets/"+uid).get();
+    const bets = betsSnap.val()||{};
+    for(const betId in bets){
+      const bet = bets[betId];
+      if(bet.status !== "pending") continue;
+      // Only ever touch the GAME-outcome leg for this event — never a prop leg,
+      // even if it happens to reference the same eventId.
+      const relevantLeg = bet.legs.find(l=>l.eventId===eventId && l.pickType==="game");
+      if(!relevantLeg) continue;
+      touched++;
+
+      const won = relevantLeg.pick === outcome;
+      if(bet.type==="single"){
+        const newStatus = won ? "won" : "lost";
+        const payout = won ? bet.stake * oddsDecimal(relevantLeg.americanOdds) : 0;
+        await db.ref(`bets/${uid}/${betId}`).update({status:newStatus, payout});
+        if(won){
+          const uref = db.ref("users/"+uid+"/credits");
+          const cur = (await uref.get()).val()||0;
+          await uref.set(cur + payout);
+        }
+      } else {
+        await resolveParlayLeg(uid, betId, bet, legMarketKey(relevantLeg), won);
+      }
+    }
+  }
+  if(!silent) toast("Settled game: "+eventId);
+  return touched;
+}
+
+async function settleEvent(){
+  const eventId = document.getElementById("adminSettleEventId").value.trim();
+  const outcome = document.getElementById("adminSettleOutcome").value;
+  if(!eventId) return;
+  await settleGameOutcome(eventId, outcome, false);
+}
+
+async function settlePropBet(){
+  const propId = document.getElementById("adminSettlePropId").value.trim();
+  const winningLabel = document.getElementById("adminSettlePropOutcome").value;
+  if(!propId || !winningLabel){ toast("Pick a prop and a winning option first."); return; }
+
+  const usersSnap = await db.ref("users").get();
+  const users = usersSnap.val()||{};
+
+  for(const uid in users){
+    const betsSnap = await db.ref("bets/"+uid).get();
+    const bets = betsSnap.val()||{};
+    for(const betId in bets){
+      const bet = bets[betId];
+      if(bet.status !== "pending") continue;
+      const relevantLeg = bet.legs.find(l=>l.pickType==="prop" && l.propId===propId);
+      if(!relevantLeg) continue;
+
+      const won = relevantLeg.label === winningLabel;
+      if(bet.type==="single"){
+        const newStatus = won ? "won" : "lost";
+        const payout = won ? bet.stake * oddsDecimal(relevantLeg.americanOdds) : 0;
+        await db.ref(`bets/${uid}/${betId}`).update({status:newStatus, payout});
+        if(won){
+          const uref = db.ref("users/"+uid+"/credits");
+          const cur = (await uref.get()).val()||0;
+          await uref.set(cur + payout);
+        }
+      } else {
+        await resolveParlayLeg(uid, betId, bet, legMarketKey(relevantLeg), won);
+      }
+    }
+  }
+  toast("Settled prop: "+propId);
+  renderAdmin(document.getElementById("main"));
+}
+
+// Shared parlay-leg resolution: records this leg's result, and once every leg in
+// the parlay has a recorded result, pays out (only if every leg won).
+async function resolveParlayLeg(uid, betId, bet, marketKey, won){
+  const legResults = bet.legResults || {};
+  legResults[marketKey] = won;
+  await db.ref(`bets/${uid}/${betId}/legResults`).set(legResults);
+  const allSettled = bet.legs.every(l => legResults[legMarketKey(l)] !== undefined);
+  if(allSettled){
+    const allWon = bet.legs.every(l => legResults[legMarketKey(l)]===true);
+    if(allWon){
+      let combinedDecimal = 1;
+      bet.legs.forEach(l=> combinedDecimal *= oddsDecimal(l.americanOdds));
+      const payout = bet.stake * combinedDecimal;
+      await db.ref(`bets/${uid}/${betId}`).update({status:"won", payout});
+      const uref = db.ref("users/"+uid+"/credits");
+      const cur = (await uref.get()).val()||0;
+      await uref.set(cur + payout);
+    } else {
+      await db.ref(`bets/${uid}/${betId}`).update({status:"lost", payout:0});
+    }
+  }
+}
+
+/* =========================================================
+   AUTOMATIC ODDS FETCHING
+   Runs on login and every 5 minutes while the app is open — no
+   manual refresh needed. For World Cup / MLB / UFC it also
+   auto-discovers real fixtures (replacing "TBD" placeholders)
+   and recomputes UFC method/round prop odds from the live line.
+   Golf and any sport outside API coverage still need Admin's
+   manual "Add/edit event" box.
+   ========================================================= */
+const SPORT_KEYS = {
+  "soccer_fifa_world_cup": { sportLabel:"World Cup" },
+  "baseball_mlb":          { sportLabel:"MLB", teamFilter:["Blue Jays","Yankees","Dodgers"] },
+  "mma_mixed_martial_arts":{ sportLabel:"UFC 329 — Auto-added", dayFilter:"2026-07-11" }
+};
+let _oddsRefreshTimer = null;
+let lastOddsRefresh = null;
+
+function utcToEtDateKey(commenceTimeIso){
+  const d = new Date(commenceTimeIso);
+  const et = new Date(d.getTime() - 4*60*60*1000); // approx EDT (UTC-4), fine for a July weekend
+  return et.toISOString().slice(0,10);
+}
+
+async function autoFetchOdds(silent){
+  if(!ODDS_API_KEY){ if(!silent) toast("No Odds API key set in the code — add one to enable auto-fetch."); return; }
+  let updatedCount=0, addedCount=0;
+
+  for(const key in SPORT_KEYS){
+    const cfg = SPORT_KEYS[key];
+    try{
+      const res = await fetch(`https://api.the-odds-api.com/v4/sports/${key}/odds/?regions=us&markets=h2h&apiKey=${ODDS_API_KEY}`);
+      const data = await res.json();
+      if(!Array.isArray(data)) continue;
+
+      data.forEach(game=>{
+        const dayKey = utcToEtDateKey(game.commence_time);
+        if(cfg.dayFilter && dayKey!==cfg.dayFilter) return;
+        if(!EVENTS[dayKey]) return; // outside our tracked weekend, ignore
+        if(cfg.teamFilter && !cfg.teamFilter.some(t=> game.home_team.includes(t)||game.away_team.includes(t))) return;
+
+        const bk = game.bookmakers?.[0];
+        const outcomes = bk?.markets?.[0]?.outcomes || [];
+        const homePrice = outcomes.find(o=>o.name===game.home_team)?.price;
+        const awayPrice = outcomes.find(o=>o.name===game.away_team)?.price;
+        if(homePrice===undefined || awayPrice===undefined) return;
+
+        // Try to match an already-seeded event for that day by team name
+        let matched=null;
+        for(const sport in EVENTS[dayKey]){
+          const found = EVENTS[dayKey][sport].find(e=>
+            e.teams.includes(game.home_team) || e.teams.includes(game.away_team) ||
+            e.teams.some(t=> t!=="TBD" && (game.home_team.includes(t)||game.away_team.includes(t)))
+          );
+          if(found){ matched=found; break; }
+        }
+
+        if(matched){
+          matched.odds.home = homePrice;
+          matched.odds.away = awayPrice;
+          if(matched.teams.includes("TBD") || /set via Admin/i.test(matched.title)){
+            matched.teams = [game.home_team, game.away_team];
+            matched.title = `${game.home_team} vs. ${game.away_team}`;
+          }
+          if(key==="mma_mixed_martial_arts" && matched.props?.length){
+            matched.props = matched.props.map(p=> p.id.endsWith("_mr")
+              ? {...p, options: methodRoundOptions(game.home_team, homePrice<0, game.away_team, awayPrice<0, p.options.length>14?5:3)}
+              : p);
+          }
+          updatedCount++;
+        } else {
+          const bucket = cfg.sportLabel;
+          if(!EVENTS[dayKey][bucket]) EVENTS[dayKey][bucket]=[];
+          const newEv = { id:"auto_"+game.id, title:`${game.home_team} vs. ${game.away_team}`,
+            teams:[game.home_team,game.away_team], time:game.commence_time,
+            odds:{home:homePrice, away:awayPrice}, props:[] };
+          if(key==="mma_mixed_martial_arts"){
+            newEv.props = [{ id:newEv.id+"_mr", q:"Method & round of victory",
+              options: methodRoundOptions(game.home_team, homePrice<0, game.away_team, awayPrice<0, 3) }];
+          }
+          EVENTS[dayKey][bucket].push(newEv);
+          addedCount++;
+        }
+      });
+    }catch(e){ console.error("Auto odds fetch failed for "+key, e); }
+  }
+
+  lastOddsRefresh = new Date();
+  if(!silent) toast(updatedCount||addedCount ? `Live: ${updatedCount} odds updated, ${addedCount} new fixture(s) found.` : "Checked — no changes yet.");
+  if(currentView==="games"||currentView==="props") renderView();
+}
+
+/* Live scores — fetched on the same cycle as odds, for World Cup / MLB / UFC.
+   This only DISPLAYS scores on event cards and gives Admin a live reference
+   when settling; it never auto-settles bets (props especially can't be
+   resolved from a score feed, and a human should confirm real-money-feel
+   payouts before they go out). */
+async function autoFetchScores(){
+  if(!ODDS_API_KEY) return;
+  for(const key in SPORT_KEYS){
+    try{
+      const res = await fetch(`https://api.the-odds-api.com/v4/sports/${key}/scores/?apiKey=${ODDS_API_KEY}&daysFrom=3`);
+      const data = await res.json();
+      if(!Array.isArray(data)) continue;
+      data.forEach(game=>{
+        for(const day in EVENTS){
+          for(const sport in EVENTS[day]){
+            const ev = EVENTS[day][sport].find(e=>
+              e.teams.includes(game.home_team) || e.teams.includes(game.away_team) ||
+              e.teams.some(t=> t!=="TBD" && (game.home_team.includes(t)||game.away_team.includes(t)))
+            );
+            if(!ev) continue;
+            const homeScore = game.scores?.find(s=>s.name===game.home_team)?.score;
+            const awayScore = game.scores?.find(s=>s.name===game.away_team)?.score;
+            ev.liveScore = { home:homeScore, away:awayScore, completed:!!game.completed, lastUpdate:game.last_update };
+
+            // Auto-settle game (moneyline) bets the instant a final score comes back —
+            // this is the one part of settlement that's genuinely unambiguous enough
+            // to automate. Prop bets and fish catches still need a human, always.
+            if(AUTO_SETTLE_GAMES && ev.liveScore.completed && homeScore!==undefined && awayScore!==undefined && homeScore!==null && awayScore!==null){
+              const hs = Number(homeScore), as = Number(awayScore);
+              const outcome = hs>as ? "home" : as>hs ? "away" : "draw";
+              settleGameOutcome(ev.id, outcome, true).then(count=>{
+                if(count>0){
+                  const winnerName = outcome==="draw" ? "Draw" : (outcome==="home" ? ev.teams[0] : ev.teams[1]);
+                  toast(`Auto-settled "${ev.title}" — ${winnerName} — ${count} bet(s) resolved.`);
+                }
+              });
+            }
+          }
+        }
+      });
+    }catch(e){ console.error("Score fetch failed for "+key, e); }
+  }
+  if(currentView==="games"||currentView==="props"||currentView==="admin") renderView();
+}
+
+function startAutoOddsRefresh(){
+  autoFetchOdds(true); autoFetchScores(); // immediately on login
+  if(_oddsRefreshTimer) clearInterval(_oddsRefreshTimer);
+  _oddsRefreshTimer = setInterval(()=>{ autoFetchOdds(true); autoFetchScores(); }, 5*60*1000); // every 5 min while app is open
+}
+// kept as an alias so the Admin "force refresh" button still works
+async function refreshOddsFromApi(){ await autoFetchOdds(false); await autoFetchScores(); }
+
+/* Load any admin-added events from Firebase on startup, merging into local EVENTS */
+db.ref("eventsOverride").on("value", snap=>{
+  const overrides = snap.val();
+  if(!overrides) return;
+  for(const day in overrides){
+    if(!EVENTS[day]) EVENTS[day] = {};
+    for(const sportKey in overrides[day]){
+      // sportKey was sanitized on save; find matching real sport name or just use as-is
+      EVENTS[day][sportKey] = overrides[day][sportKey];
+    }
+  }
+  if(currentView==="games"||currentView==="props") renderView();
+});
+</script>
+</body>
+</html>
