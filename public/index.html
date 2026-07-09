@@ -1364,8 +1364,60 @@ function utcToEtDateKey(commenceTimeIso){
   return et.toISOString().slice(0,10);
 }
 
+// Fixture discovery (teams, kickoff time) using the free /events endpoint —
+// this doesn't cost API quota and doesn't depend on any bookmaker having
+// posted odds yet, so a freshly-confirmed matchup fills in immediately even
+// before lines exist. Odds themselves are layered in separately below.
+async function autoDiscoverFixtures(){
+  if(!ODDS_API_KEY) return;
+  const claimedIds = new Set();
+  let filledCount = 0;
+
+  for(const key in SPORT_KEYS){
+    const cfg = SPORT_KEYS[key];
+    try{
+      const res = await fetch(`https://api.the-odds-api.com/v4/sports/${key}/events/?apiKey=${ODDS_API_KEY}`);
+      const data = await res.json();
+      if(!Array.isArray(data)) continue;
+
+      data.forEach(game=>{
+        const dayKey = utcToEtDateKey(game.commence_time);
+        if(cfg.dayFilter && dayKey!==cfg.dayFilter) return;
+        if(!EVENTS[dayKey]) return;
+        if(cfg.teamFilter && !cfg.teamFilter.some(t=> game.home_team.includes(t)||game.away_team.includes(t))) return;
+
+        let matched=null;
+        for(const sport in EVENTS[dayKey]){
+          const found = EVENTS[dayKey][sport].find(e=>
+            !claimedIds.has(e.id) && (
+              e.teams.includes(game.home_team) || e.teams.includes(game.away_team) ||
+              e.teams.some(t=> t!=="TBD" && (game.home_team.includes(t)||game.away_team.includes(t)))
+            )
+          );
+          if(found){ matched=found; break; }
+        }
+        if(!matched && EVENTS[dayKey][cfg.sportLabel]){
+          matched = EVENTS[dayKey][cfg.sportLabel].find(e=> !claimedIds.has(e.id) && e.teams.includes("TBD"));
+        }
+        if(!matched) return;
+        claimedIds.add(matched.id);
+
+        if(matched.teams.includes("TBD") || /set via Admin/i.test(matched.title)){
+          matched.teams = [game.home_team, game.away_team];
+          matched.title = `${game.home_team} vs. ${game.away_team}`;
+          matched.time = game.commence_time; // real kickoff time, may differ from the seeded guess
+          filledCount++;
+        }
+      });
+    }catch(e){ console.error("Fixture discovery failed for "+key, e); }
+  }
+  if(filledCount>0 && (currentView==="games"||currentView==="props")) renderView();
+  return filledCount;
+}
+
 async function autoFetchOdds(silent){
   if(!ODDS_API_KEY){ if(!silent) toast("No Odds API key set in the code — add one to enable auto-fetch."); return; }
+  await autoDiscoverFixtures(); // fill in real matchups/times first, regardless of odds availability
   let updatedCount=0, addedCount=0;
   const claimedIds = new Set(); // prevents two real fixtures from filling the same TBD slot in one pass
 
@@ -1386,7 +1438,7 @@ async function autoFetchOdds(silent){
         const outcomes = bk?.markets?.[0]?.outcomes || [];
         const homePrice = outcomes.find(o=>o.name===game.home_team)?.price;
         const awayPrice = outcomes.find(o=>o.name===game.away_team)?.price;
-        if(homePrice===undefined || awayPrice===undefined) return;
+        if(homePrice===undefined || awayPrice===undefined) return; // no lines posted yet — fixture info was already filled above
 
         // Try to match an already-seeded event for that day by team name
         let matched=null;
@@ -1412,6 +1464,7 @@ async function autoFetchOdds(silent){
           if(matched.teams.includes("TBD") || /set via Admin/i.test(matched.title)){
             matched.teams = [game.home_team, game.away_team];
             matched.title = `${game.home_team} vs. ${game.away_team}`;
+            matched.time = game.commence_time;
           }
           if(key==="mma_mixed_martial_arts" && matched.props?.length){
             matched.props = matched.props.map(p=> p.id.endsWith("_mr")
