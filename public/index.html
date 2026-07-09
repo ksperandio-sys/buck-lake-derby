@@ -186,6 +186,7 @@
       <span style="font-size:.85rem;color:var(--muted);">Stake</span>
       <input type="number" id="stakeInput" min="1" step="1" placeholder="credits" oninput="renderSlip()">
     </div>
+    <div id="oddsChangedBanner" class="hidden" style="background:rgba(245,185,66,.15);border:1px solid var(--accent2);color:var(--accent2);padding:10px 12px;border-radius:10px;font-size:.8rem;margin-bottom:10px;font-weight:600;">⚠️ Odds moved — numbers below are updated. Tap Place Bet again to confirm.</div>
     <div class="summary-row"><span>Combined odds</span><b id="combOdds">—</b></div>
     <div class="summary-row"><span>To win</span><b id="toWin">—</b></div>
     <div class="summary-row"><span>Available balance</span><b id="availBal">—</b></div>
@@ -531,9 +532,18 @@ function syncStickyOffset(){
   const topBar = document.getElementById("topBar");
   if(!topBar) return;
   const h = topBar.offsetHeight;
+  document.documentElement.style.setProperty("--topbar-h", h+"px");
   document.querySelectorAll(".daytabs").forEach(d=> d.style.top = h+"px");
 }
 window.addEventListener("resize", syncStickyOffset);
+// Watches the header's actual rendered size continuously (not just at specific
+// render moments) so the sticky offset can never go stale — fixes gaps/overlaps
+// that showed up whenever topBar's real height changed in a way a one-off
+// syncStickyOffset() call didn't happen to catch.
+if(window.ResizeObserver){
+  const topBarEl = document.getElementById("topBar");
+  if(topBarEl) new ResizeObserver(()=> syncStickyOffset()).observe(topBarEl);
+}
 
 const SWIPE_ORDER = ["leaderboard","derby","mybets","games","props"]; // admin excluded from swipe, nav-tap only
 let _touchStartX=null, _touchStartY=null;
@@ -567,6 +577,8 @@ initSwipe();
 
 function liveScoreBadge(ev){
   if(!ev.liveScore) return "";
+  const evTime = new Date(ev.time);
+  if(isNaN(evTime.getTime()) || new Date() < evTime) return ""; // hasn't kicked off yet (or time data is bad) — never show LIVE/FINAL early
   const s = ev.liveScore;
   const hasScore = s.home!==undefined && s.away!==undefined && s.home!==null && s.away!==null;
   const label = s.completed ? "FINAL" : "🔴 LIVE";
@@ -711,6 +723,12 @@ function renderBettingView(main, propsOnly){
 function setDay(day){ currentDay = day; renderView(); window.scrollTo(0,0); }
 
 function togglePick(eventId, sport, day, eventTitle, pickType, pickKey, label, americanOdds, propId){
+  const ev = findEvent(eventId);
+  if(ev && isLocked(ev)){
+    toast(`"${ev.title}" has already started — picks lock at kickoff.`);
+    renderView(); // refresh so the button visually catches up immediately
+    return;
+  }
   const idx = slip.findIndex(l=> l.eventId===eventId && (pickType==='prop' ? l.propId===propId : true) );
   // For game bets: only one pick per event allowed. For prop bets: one pick per prop question.
   const existingIdx = slip.findIndex(l => l.eventId===eventId && ((pickType==='prop' && l.propId===propId) || (pickType==='game' && l.pickType==='game')));
@@ -744,14 +762,17 @@ function openSlip(){
 function closeSlip(){
   document.getElementById("modalBackdrop").classList.remove("open");
   document.getElementById("slipModal").style.display = "none";
+  requestAnimationFrame(syncStickyOffset);
 }
 function removeLeg(i){ slip.splice(i,1); updateSlipFab(); renderSlip(); renderView(); }
 
-function renderSlip(){
+function renderSlip(showOddsChangedBanner){
   const legsDiv = document.getElementById("slipLegs");
   const empty = document.getElementById("slipEmpty");
   const controls = document.getElementById("slipControls");
   const betType = document.getElementById("betTypeSelect");
+  const banner = document.getElementById("oddsChangedBanner");
+  if(banner) banner.classList.toggle("hidden", !showOddsChangedBanner);
 
   if(slip.length===0){
     legsDiv.innerHTML = "";
@@ -831,7 +852,7 @@ async function placeBet(){
     if(live!==null && live!==l.americanOdds){ l.americanOdds = live; oddsChanged = true; }
   });
   if(oddsChanged){
-    renderSlip();
+    renderSlip(true);
     toast("Odds just moved — slip updated. Review and tap Place Bet again to confirm.");
     return;
   }
@@ -1386,6 +1407,18 @@ function utcToEtDateKey(commenceTimeIso){
   return et.toISOString().slice(0,10);
 }
 
+// Shared matching rule used everywhere we try to line up an API game with one of
+// our seeded events. Once both real names are known, BOTH must match — matching
+// on just one name let an unrelated game involving the same player (e.g. an
+// earlier round) get wrongly attributed to the wrong event.
+function eventMatchesGame(e, game){
+  const bothNamesKnown = !e.teams.includes("TBD");
+  if(bothNamesKnown){
+    return e.teams.includes(game.home_team) && e.teams.includes(game.away_team);
+  }
+  return e.teams.some(t=> t!=="TBD" && (game.home_team.includes(t)||game.away_team.includes(t)));
+}
+
 // Fixture discovery (teams, kickoff time) using the free /events endpoint —
 // this doesn't cost API quota and doesn't depend on any bookmaker having
 // posted odds yet, so a freshly-confirmed matchup fills in immediately even
@@ -1410,12 +1443,7 @@ async function autoDiscoverFixtures(){
 
         let matched=null;
         for(const sport in EVENTS[dayKey]){
-          const found = EVENTS[dayKey][sport].find(e=>
-            !claimedIds.has(e.id) && (
-              e.teams.includes(game.home_team) || e.teams.includes(game.away_team) ||
-              e.teams.some(t=> t!=="TBD" && (game.home_team.includes(t)||game.away_team.includes(t)))
-            )
-          );
+          const found = EVENTS[dayKey][sport].find(e=> !claimedIds.has(e.id) && eventMatchesGame(e, game));
           if(found){ matched=found; break; }
         }
         if(!matched && EVENTS[dayKey][cfg.sportLabel]){
@@ -1446,7 +1474,7 @@ async function autoFetchOdds(silent){
   for(const key in SPORT_KEYS){
     const cfg = SPORT_KEYS[key];
     try{
-      const res = await fetch(`https://api.the-odds-api.com/v4/sports/${key}/odds/?regions=us&markets=h2h&apiKey=${ODDS_API_KEY}`);
+      const res = await fetch(`https://api.the-odds-api.com/v4/sports/${key}/odds/?regions=us&markets=h2h&oddsFormat=american&apiKey=${ODDS_API_KEY}`);
       const data = await res.json();
       if(!Array.isArray(data)) continue;
 
@@ -1465,12 +1493,7 @@ async function autoFetchOdds(silent){
         // Try to match an already-seeded event for that day by team name
         let matched=null;
         for(const sport in EVENTS[dayKey]){
-          const found = EVENTS[dayKey][sport].find(e=>
-            !claimedIds.has(e.id) && (
-              e.teams.includes(game.home_team) || e.teams.includes(game.away_team) ||
-              e.teams.some(t=> t!=="TBD" && (game.home_team.includes(t)||game.away_team.includes(t)))
-            )
-          );
+          const found = EVENTS[dayKey][sport].find(e=> !claimedIds.has(e.id) && eventMatchesGame(e, game));
           if(found){ matched=found; break; }
         }
         // Fallback: no name match (common for tennis, where seeded teams are still
@@ -1532,8 +1555,10 @@ async function autoFetchScores(){
         for(const day in EVENTS){
           for(const sport in EVENTS[day]){
             const ev = EVENTS[day][sport].find(e=>
-              e.teams.includes(game.home_team) || e.teams.includes(game.away_team) ||
-              e.teams.some(t=> t!=="TBD" && (game.home_team.includes(t)||game.away_team.includes(t)))
+              eventMatchesGame(e, game) &&
+              // extra guard specific to scores: don't attribute a score from a
+              // wildly different day/time even if names loosely matched
+              Math.abs(new Date(game.commence_time) - new Date(e.time)) < 12*60*60*1000
             );
             if(!ev) continue;
             const homeScore = game.scores?.find(s=>s.name===game.home_team)?.score;
