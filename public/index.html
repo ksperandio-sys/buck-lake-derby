@@ -28,7 +28,7 @@
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
   header{padding:14px 16px 6px;border-bottom:1px solid var(--line);}
-  #topBar{position:sticky;top:0;z-index:50;background:var(--bg);box-shadow:0 4px 12px rgba(0,0,0,.25);}
+  #topBar{background:var(--bg);}
   #swipeArea{overflow-x:hidden;touch-action:pan-y;}
   .subtabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;}
   .subtabs button{flex:0 0 auto;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:10px;font-size:.8rem;cursor:pointer;}
@@ -292,14 +292,10 @@ function mlbProps(gameId, homeLabel, awayLabel){
 let EVENTS = {
   "2026-07-09": {
     "World Cup": [
-      { id:"wc_qf1", title:"Quarterfinal 1", teams:["TBD","TBD"], time:"2026-07-09T16:00:00-04:00",
+      { id:"wc_qf1", title:"Quarterfinal 1: France vs. Morocco", teams:["France","Morocco"], time:"2026-07-09T16:00:00-04:00",
         odds:{home:-110, away:-110}, props:[
           { id:"wc_qf1_ot", q:"Match decided in extra time or penalties?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
           { id:"wc_qf1_gt3", q:"Total goals over/under 2.5", options:[{label:"Over 2.5",odds:-105},{label:"Under 2.5",odds:-115}] }
-        ]},
-      { id:"wc_qf2", title:"Quarterfinal 2", teams:["TBD","TBD"], time:"2026-07-09T20:00:00-04:00",
-        odds:{home:-130, away:220}, props:[
-          { id:"wc_qf2_bts", q:"Both teams to score?", options:[{label:"Yes",odds:-120},{label:"No",odds:100}] }
         ]}
     ],
     "Wimbledon": [
@@ -317,10 +313,10 @@ let EVENTS = {
   },
   "2026-07-10": {
     "World Cup": [
-      { id:"wc_qf3", title:"Quarterfinal 3", teams:["TBD","TBD"], time:"2026-07-10T16:00:00-04:00",
-        odds:{home:150, away:-170}, props:[]},
-      { id:"wc_qf4", title:"Quarterfinal 4", teams:["TBD","TBD"], time:"2026-07-10T20:00:00-04:00",
-        odds:{home:-140, away:280}, props:[]}
+      { id:"wc_qf2", title:"Quarterfinal 2: Spain vs. Belgium", teams:["Spain","Belgium"], time:"2026-07-10T15:00:00-04:00",
+        odds:{home:-150, away:280}, props:[
+          { id:"wc_qf2_bts", q:"Both teams to score?", options:[{label:"Yes",odds:-120},{label:"No",odds:100}] }
+        ]}
     ],
     "Wimbledon": [
       { id:"wim_m_semi1", title:"Men's Semifinal 1", teams:["TBD","TBD"], time:"2026-07-10T08:30:00-04:00",
@@ -335,11 +331,22 @@ let EVENTS = {
         ]}
     ],
     "MLB": [
-      { id:"mlb_jul10_1", title:"MLB Game — set via Admin", teams:["TBD","TBD"], time:"2026-07-10T19:07:00-04:00",
-        odds:{home:-115, away:-105}, props: mlbProps("mlb_jul10_1","Home","Away")}
+      { id:"mlb_jul10_1", title:"Toronto Blue Jays @ San Diego Padres", teams:["Padres","Blue Jays"], time:"2026-07-10T21:40:00-04:00",
+        odds:{home:-115, away:-105}, props: mlbProps("mlb_jul10_1","Padres","Blue Jays")}
     ]
   },
   "2026-07-11": {
+    "World Cup": [
+      { id:"wc_qf3", title:"Quarterfinal 3: Norway vs. England", teams:["Norway","England"], time:"2026-07-11T17:00:00-04:00",
+        odds:{home:210, away:-260}, props:[
+          { id:"wc_qf3_ot", q:"Match decided in extra time or penalties?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
+          { id:"wc_qf3_gt3", q:"Total goals over/under 2.5", options:[{label:"Over 2.5",odds:-105},{label:"Under 2.5",odds:-115}] }
+        ]},
+      { id:"wc_qf4", title:"Quarterfinal 4: Argentina vs. Switzerland", teams:["Argentina","Switzerland"], time:"2026-07-11T21:00:00-04:00",
+        odds:{home:-190, away:400}, props:[
+          { id:"wc_qf4_bts", q:"Both teams to score?", options:[{label:"Yes",odds:-120},{label:"No",odds:100}] }
+        ]}
+    ],
     "Wimbledon": [
       { id:"wim_womens_final", title:"Women's Singles Final", teams:["TBD","TBD"], time:"2026-07-11T09:00:00-04:00",
         odds:{home:-150, away:130}, props:[
@@ -383,8 +390,8 @@ let EVENTS = {
     "MLB": [
       { id:"mlb_dodgers_ari_2", title:"Arizona Diamondbacks @ LA Dodgers", teams:["Diamondbacks","Dodgers"], time:"2026-07-12T16:10:00-04:00",
         odds:{home:-155, away:135}, props: mlbProps("mlb_dodgers_ari_2","Dodgers","Diamondbacks")},
-      { id:"mlb_jays_jul12", title:"Blue Jays — set via Admin", teams:["TBD","TBD"], time:"2026-07-12T17:00:00-04:00",
-        odds:{home:-110, away:-110}, props: mlbProps("mlb_jays_jul12","Home","Away")}
+      { id:"mlb_jays_jul12", title:"Toronto Blue Jays @ San Diego Padres", teams:["Padres","Blue Jays"], time:"2026-07-12T16:10:00-04:00",
+        odds:{home:-110, away:-110}, props: mlbProps("mlb_jays_jul12","Padres","Blue Jays")}
     ]
   }
 };
