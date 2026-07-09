@@ -1195,7 +1195,41 @@ function renderAdmin(main){
       <p style="font-size:.8rem;">Check the photo matches the claimed type and length looks plausible, then approve or reject. Approved catches count immediately on the Derby leaderboard.</p>
       ${renderAdminCatchesHtml()}
     </div>
+
+    <div class="card adminbox" style="border-color:var(--lose);">
+      <h3 style="margin-top:0;color:var(--lose);">⚠️ Danger Zone</h3>
+      <p style="font-size:.8rem;">Resets everyone's credits back to 100, deletes every bet, and deletes every fish catch (pending, approved, and rejected). Odds, matchups, and props are untouched — this only wipes player activity. Can't be undone.</p>
+      <button class="btn" style="background:var(--lose);color:#2a0a0a;" onclick="confirmResetAllData()">Reset All Bets & Catches</button>
+    </div>
   `;
+}
+
+let _resetConfirmPending = false;
+function confirmResetAllData(){
+  if(!_resetConfirmPending){
+    _resetConfirmPending = true;
+    toast("Tap the button again within 5 seconds to confirm the reset.");
+    setTimeout(()=>{ _resetConfirmPending = false; }, 5000);
+    return;
+  }
+  _resetConfirmPending = false;
+  resetAllData();
+}
+async function resetAllData(){
+  try{
+    const usersSnap = await db.ref("users").get();
+    const users = usersSnap.val()||{};
+    for(const uid in users){
+      await db.ref("users/"+uid+"/credits").set(100);
+    }
+    await db.ref("bets").set(null);
+    await db.ref("catches").set(null);
+    toast("Reset complete — everyone's back to 100 credits, all bets and catches cleared.");
+    renderAdmin(document.getElementById("main"));
+  }catch(err){
+    console.error("resetAllData failed", err);
+    toast("Reset failed: " + err.message);
+  }
 }
 
 let allowedEmailsCache = [];
