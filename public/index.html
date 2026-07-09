@@ -30,7 +30,6 @@
   header{padding:14px 16px 6px;border-bottom:1px solid var(--line);}
   #topBar{position:sticky;top:0;z-index:50;background:var(--bg);box-shadow:0 4px 12px rgba(0,0,0,.25);}
   #swipeArea{overflow-x:hidden;touch-action:pan-y;}
-  .daytabs{position:sticky;z-index:40;background:var(--bg);padding-top:10px;margin-bottom:0 !important;padding-bottom:10px;border-bottom:1px solid var(--line);}
   .subtabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;}
   .subtabs button{flex:0 0 auto;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:10px;font-size:.8rem;cursor:pointer;}
   .subtabs button.active{border-color:var(--accent);color:var(--accent);}
@@ -47,9 +46,6 @@
   nav button.active{background:var(--accent);color:#04211f;border-color:var(--accent);font-weight:700;}
   main{padding:14px 16px 100px;max-width:720px;margin:0 auto;}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px;}
-  .daytabs{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;}
-  .daytabs button{flex:0 0 auto;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:10px;font-size:.8rem;cursor:pointer;}
-  .daytabs button.active{border-color:var(--accent);color:var(--accent);}
   .sport-header{display:flex;align-items:center;gap:8px;margin:18px 0 8px;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:1px;}
   .sport-header::after{content:"";flex:1;height:1px;background:var(--line);}
   .locked-badge{font-size:.65rem;background:var(--panel2);color:var(--muted);padding:2px 8px;border-radius:6px;margin-left:6px;}
@@ -728,7 +724,7 @@ function renderBettingView(main, propsOnly){
   }
 
   main.innerHTML = `
-    <div class="daytabs">${dayTabs}</div>
+    <div class="subtabs">${dayTabs}</div>
     ${sportsHtml || '<div class="empty">Nothing to show for this day yet.</div>'}
   `;
 }
@@ -748,7 +744,7 @@ function togglePick(eventId, sport, day, eventTitle, pickType, pickKey, label, a
     if(slip[existingIdx].label===label){ slip.splice(existingIdx,1); updateSlipFab(); renderView(); return; }
     slip.splice(existingIdx,1);
   }
-  slip.push({eventId, sport, day, eventTitle, pickType, pick:pickKey, propId, label, americanOdds:Number(americanOdds)});
+  slip.push({eventId, sport, day, eventTitle, pickType, pick:pickKey, propId: propId ?? null, label, americanOdds:Number(americanOdds)});
   updateSlipFab();
   renderView();
 }
@@ -1414,7 +1410,13 @@ async function resolveParlayLeg(uid, betId, bet, marketKey, won){
 const SPORT_KEYS = {
   "soccer_fifa_world_cup": { sportLabel:"World Cup" },
   "baseball_mlb":          { sportLabel:"MLB", teamFilter:["Blue Jays","Yankees","Dodgers"] },
-  "mma_mixed_martial_arts":{ sportLabel:"UFC 329 — Auto-added", dayFilter:"2026-07-11" },
+  // "mma_mixed_martial_arts" is a single key covering ALL MMA promotions (UFC,
+  // Bellator, ONE, PFL, regional cards, etc.) — there's no way to filter to just
+  // UFC from the API. noAutoAdd=true means this can only UPDATE ODDS on the 14
+  // real UFC 329 fights already hand-seeded below; it will never create a new
+  // fight card entry, which is what let an unrelated European MMA event's fights
+  // show up as if they were part of UFC 329.
+  "mma_mixed_martial_arts":{ sportLabel:"UFC 329 — Main Card (9pm ET)", dayFilter:"2026-07-11", noAutoAdd:true },
   "tennis_atp_wimbledon":  { sportLabel:"Wimbledon" },
   "tennis_wta_wimbledon":  { sportLabel:"Wimbledon" }
 };
@@ -1537,7 +1539,7 @@ async function autoFetchOdds(silent){
               : p);
           }
           updatedCount++;
-        } else {
+        } else if(!cfg.noAutoAdd) {
           const bucket = cfg.sportLabel;
           if(!EVENTS[dayKey][bucket]) EVENTS[dayKey][bucket]=[];
           const newEv = { id:"auto_"+game.id, title:`${game.home_team} vs. ${game.away_team}`,
