@@ -306,12 +306,12 @@ let EVENTS = {
         ]}
     ],
     "Wimbledon": [
-      { id:"wim_w_semi1", title:"Women's Semifinal 1", teams:["TBD","TBD"], time:"2026-07-09T08:30:00-04:00",
+      { id:"wim_w_semi1", title:"Women's Semifinal 1: Karolina Muchova vs. Coco Gauff", teams:["Karolina Muchova","Coco Gauff"], time:"2026-07-09T08:30:00-04:00",
         odds:{home:-140, away:120}, props:[
           { id:"wim_w_semi1_sets", q:"Match goes 3 sets?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
           { id:"wim_w_semi1_df", q:"Total double faults (both players combined) over/under 12.5", options:[{label:"Over 12.5",odds:-110},{label:"Under 12.5",odds:-110}] }
         ]},
-      { id:"wim_w_semi2", title:"Women's Semifinal 2", teams:["TBD","TBD"], time:"2026-07-09T10:30:00-04:00",
+      { id:"wim_w_semi2", title:"Women's Semifinal 2: Linda Noskova vs. Marta Kostyuk", teams:["Linda Noskova","Marta Kostyuk"], time:"2026-07-09T10:30:00-04:00",
         odds:{home:130, away:-150}, props:[
           { id:"wim_w_semi2_sets", q:"Match goes 3 sets?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
           { id:"wim_w_semi2_df", q:"Total double faults (both players combined) over/under 12.5", options:[{label:"Over 12.5",odds:-110},{label:"Under 12.5",odds:-110}] }
@@ -330,13 +330,13 @@ let EVENTS = {
         ]}
     ],
     "Wimbledon": [
-      { id:"wim_m_semi1", title:"Men's Semifinal 1", teams:["TBD","TBD"], time:"2026-07-10T08:30:00-04:00",
-        odds:{home:-160, away:135}, props:[
+      { id:"wim_m_semi1", title:"Men's Semifinal 1: Alexander Zverev vs. Arthur Fery", teams:["Alexander Zverev","Arthur Fery"], time:"2026-07-10T08:30:00-04:00",
+        odds:{home:-600, away:450}, props:[
           { id:"wim_m_semi1_sets", q:"Match goes 5 sets?", options:[{label:"Yes",odds:170},{label:"No",odds:-200}] },
           { id:"wim_m_semi1_df", q:"Total double faults (both players combined) over/under 14.5", options:[{label:"Over 14.5",odds:-110},{label:"Under 14.5",odds:-110}] }
         ]},
-      { id:"wim_m_semi2", title:"Men's Semifinal 2", teams:["TBD","TBD"], time:"2026-07-10T10:30:00-04:00",
-        odds:{home:110, away:-130}, props:[
+      { id:"wim_m_semi2", title:"Men's Semifinal 2: Jannik Sinner vs. Novak Djokovic", teams:["Jannik Sinner","Novak Djokovic"], time:"2026-07-10T10:30:00-04:00",
+        odds:{home:-140, away:120}, props:[
           { id:"wim_m_semi2_sets", q:"Match goes 5 sets?", options:[{label:"Yes",odds:170},{label:"No",odds:-200}] },
           { id:"wim_m_semi2_df", q:"Total double faults (both players combined) over/under 14.5", options:[{label:"Over 14.5",odds:-110},{label:"Under 14.5",odds:-110}] }
         ]}
@@ -1008,6 +1008,24 @@ async function loadAllBets(manualRefresh){
   }
 }
 
+// A placed bet stores a snapshot of the event title/label at that exact
+// moment — if that was before real team names were known, it's frozen as
+// "TBD" forever unless we re-resolve it against current event data. Odds
+// stay as the snapshot (that's what was actually agreed to); only the
+// display text updates.
+function resolveLegDisplay(l){
+  const ev = findEvent(l.eventId);
+  if(!ev) return { title: l.eventTitle, label: l.label };
+  if(l.pickType === "game"){
+    const label = l.pick==="home" ? ev.teams[0] : l.pick==="away" ? ev.teams[1] : "Draw";
+    return { title: ev.title, label };
+  } else {
+    const prop = (ev.props||[]).find(p=>p.id===l.propId);
+    const title = prop ? `${ev.title} — ${prop.q}` : l.eventTitle;
+    return { title, label: l.label };
+  }
+}
+
 function renderBetCardsHtml(arr){
   arr.sort((a,b)=>b.placedAt-a.placedAt);
   if(arr.length===0) return '<div class="card empty">No bets placed yet.</div>';
@@ -1028,8 +1046,9 @@ function renderBetCardsHtml(arr){
                   : result===false ? '<span style="color:var(--lose);">❌ Lost</span>'
                   : '<span style="color:var(--muted);">⏳ Pending</span>';
       }
+      const disp = resolveLegDisplay(l);
       return `<div style="font-size:.8rem;color:var(--muted);display:flex;justify-content:space-between;gap:8px;padding:3px 0;">
-        <span>${l.eventTitle} — <b style="color:var(--text);">${l.label}</b> (${fmtOdds(l.americanOdds)})</span>
+        <span>${disp.title} — <b style="color:var(--text);">${disp.label}</b> (${fmtOdds(l.americanOdds)})</span>
         <span style="white-space:nowrap;font-size:.75rem;">${legStatus}</span>
       </div>`;
     }).join("");
