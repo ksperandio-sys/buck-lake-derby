@@ -1282,6 +1282,7 @@ function renderAdmin(main){
       <hr style="border-color:var(--line);margin:16px 0;">
 
       <label>Settle a prop bet</label>
+      <p style="font-size:.8rem;">A few prop types settle themselves automatically the moment their game's final score comes in: total goals/runs/points over-under, "both teams to score," and "either team scores N+" — all genuinely derivable from a final score. Everything else (double faults, sets played, first to score, method of victory) has no data source for it and always needs you to settle it by hand below.</p>
       <input id="adminSettlePropId" placeholder="Prop ID, e.g. ufc_main_mr" oninput="loadPropOutcomeOptions()">
       <select id="adminSettlePropOutcome"><option value="">— type a Prop ID above —</option></select>
       <button class="btn" onclick="settlePropBet()">Settle Prop & Pay Out</button>
@@ -1489,13 +1490,10 @@ async function settleEvent(){
   await settleGameOutcome(eventId, outcome, false);
 }
 
-async function settlePropBet(){
-  const propId = document.getElementById("adminSettlePropId").value.trim();
-  const winningLabel = document.getElementById("adminSettlePropOutcome").value;
-  if(!propId || !winningLabel){ toast("Pick a prop and a winning option first."); return; }
-
+async function settlePropOutcome(propId, winningLabel, silent){
   const usersSnap = await db.ref("users").get();
   const users = usersSnap.val()||{};
+  let touched = 0;
 
   for(const uid in users){
     const betsSnap = await db.ref("bets/"+uid).get();
@@ -1505,6 +1503,7 @@ async function settlePropBet(){
       if(bet.status !== "pending") continue;
       const relevantLeg = bet.legs.find(l=>l.pickType==="prop" && l.propId===propId);
       if(!relevantLeg) continue;
+      touched++;
 
       const won = relevantLeg.label === winningLabel;
       if(bet.type==="single"){
@@ -1525,8 +1524,57 @@ async function settlePropBet(){
   const found = findPropById(propId);
   if(found){ found.prop.settled = true; found.prop.winningLabel = winningLabel; }
   await db.ref("settledProps/"+propId).set({winningLabel});
-  toast("Settled prop: "+propId);
+  if(!silent) toast("Settled prop: "+propId);
+  return touched;
+}
+
+async function settlePropBet(){
+  const propId = document.getElementById("adminSettlePropId").value.trim();
+  const winningLabel = document.getElementById("adminSettlePropOutcome").value;
+  if(!propId || !winningLabel){ toast("Pick a prop and a winning option first."); return; }
+  await settlePropOutcome(propId, winningLabel, false);
   renderAdmin(document.getElementById("main"));
+}
+
+// Automatically settles the subset of props that are genuinely derivable from a
+// final score alone — total over/under, "both teams to score", "either team
+// scores N+". Anything needing real match stats (double faults, sets played,
+// first team to score, method of victory) has no data source and stays manual —
+// that's a hard limit of what's actually knowable from a score, not a choice.
+async function autoSettleDerivableProps(ev){
+  if(!ev.liveScore || !ev.liveScore.completed) return;
+  const home = Number(ev.liveScore.home), away = Number(ev.liveScore.away);
+  if(isNaN(home) || isNaN(away)) return;
+  const total = home + away;
+
+  for(const p of (ev.props||[])){
+    if(p.settled) continue;
+    let winningLabel = null;
+
+    // Deliberately narrow — "goals/runs/points" are the actual final score we
+    // have. Anything else phrased as "over/under" (e.g. "double faults over/
+    // under 12.5") is NOT derivable from a final score and must stay manual.
+    const overUnderMatch = p.q.match(/total (goals|runs|points) over\/under (\d+\.?\d*)/i);
+    if(overUnderMatch){
+      const line = Number(overUnderMatch[2]);
+      const overOpt = (p.options||[]).find(o=>/^over/i.test(o.label));
+      const underOpt = (p.options||[]).find(o=>/^under/i.test(o.label));
+      if(overOpt && underOpt) winningLabel = total > line ? overOpt.label : underOpt.label;
+    } else if(/both teams to score/i.test(p.q)){
+      winningLabel = (home>0 && away>0) ? "Yes" : "No";
+    } else {
+      const scoreNPlusMatch = p.q.match(/score (\d+)\+/i);
+      if(scoreNPlusMatch){
+        const threshold = Number(scoreNPlusMatch[1]);
+        winningLabel = (Math.max(home,away) >= threshold) ? "Yes" : "No";
+      }
+    }
+
+    if(winningLabel){
+      const count = await settlePropOutcome(p.id, winningLabel, true);
+      if(count>0) toast(`Auto-settled prop "${p.q}" — ${winningLabel}`);
+    }
+  }
 }
 
 // Shared parlay-leg resolution: records this leg's result, and once every leg in
@@ -1744,7 +1792,10 @@ async function autoFetchScores(){
 
             // Auto-settle game (moneyline) bets the instant a final score comes back —
             // this is the one part of settlement that's genuinely unambiguous enough
-            // to automate. Prop bets and fish catches still need a human, always.
+            // to automate. Prop bets and fish catches still need a human, always —
+            // except the small subset of props that are themselves just derived
+            // from the final score (total over/under, both teams to score, etc.),
+            // which autoSettleDerivableProps handles below.
             if(AUTO_SETTLE_GAMES && ev.liveScore.completed && homeScore!==undefined && awayScore!==undefined && homeScore!==null && awayScore!==null){
               const hs = Number(homeScore), as = Number(awayScore);
               const outcome = hs>as ? "home" : as>hs ? "away" : "draw";
@@ -1754,6 +1805,7 @@ async function autoFetchScores(){
                   toast(`Auto-settled "${ev.title}" — ${winnerName} — ${count} bet(s) resolved.`);
                 }
               });
+              autoSettleDerivableProps(ev);
             }
           }
         }
