@@ -711,10 +711,13 @@ function renderBettingView(main, propsOnly){
         if(ev.isOutright) return ""; // outrights only show in props view
         const homeSel = slip.some(l=>l.eventId===ev.id && l.pick==="home");
         const awaySel = slip.some(l=>l.eventId===ev.id && l.pick==="away");
+        const resultBadge = (pick)=> ev.settled ? (pick===ev.settledOutcome
+          ? '<span style="color:var(--win);margin-left:4px;">✅</span>'
+          : '<span style="color:var(--lose);margin-left:4px;">❌</span>') : '';
         const drawBtn = ev.odds.draw ? `
           <div class="pickbtn ${locked?'disabled':''} ${slip.some(l=>l.eventId===ev.id&&l.pick==='draw')?'selected':''}"
                onclick="togglePick('${ev.id}','${sport}','${currentDay}','${ev.title.replace(/'/g,"\\'")}','game','draw','Draw',${ev.odds.draw})">
-            <div class="side">Draw</div><div class="odds">${fmtOdds(ev.odds.draw)}</div>
+            <div class="side">Draw${resultBadge('draw')}</div><div class="odds">${fmtOdds(ev.odds.draw)}</div>
           </div>` : "";
         return `
           <div class="event">
@@ -724,12 +727,12 @@ function renderBettingView(main, propsOnly){
             <div class="pickrow">
               <div class="pickbtn ${locked?'disabled':''} ${homeSel?'selected':''}"
                    onclick="togglePick('${ev.id}','${sport}','${currentDay}','${ev.title.replace(/'/g,"\\'")}','game','home','${ev.teams[0].replace(/'/g,"\\'")}',${ev.odds.home})">
-                <div class="side">${ev.teams[0]}</div><div class="odds">${fmtOdds(ev.odds.home)}</div>
+                <div class="side">${ev.teams[0]}${resultBadge('home')}</div><div class="odds">${fmtOdds(ev.odds.home)}</div>
               </div>
               ${drawBtn}
               <div class="pickbtn ${locked?'disabled':''} ${awaySel?'selected':''}"
                    onclick="togglePick('${ev.id}','${sport}','${currentDay}','${ev.title.replace(/'/g,"\\'")}','game','away','${ev.teams[1].replace(/'/g,"\\'")}',${ev.odds.away})">
-                <div class="side">${ev.teams[1]}</div><div class="odds">${fmtOdds(ev.odds.away)}</div>
+                <div class="side">${ev.teams[1]}${resultBadge('away')}</div><div class="odds">${fmtOdds(ev.odds.away)}</div>
               </div>
             </div>
           </div>`;
@@ -739,9 +742,12 @@ function renderBettingView(main, propsOnly){
         const propsHtml = ev.props.map(p=>{
           const optsHtml = (p.options||[]).map(o=>{
             const sel = slip.some(l=>l.eventId===ev.id && l.propId===p.id && l.label===o.label);
+            const badge = p.settled ? (o.label===p.winningLabel
+              ? '<span style="color:var(--win);margin-left:4px;">✅</span>'
+              : '<span style="color:var(--lose);margin-left:4px;">❌</span>') : '';
             return `<div class="pickbtn ${locked?'disabled':''} ${sel?'selected':''}"
                  onclick="togglePick('${ev.id}','${sport}','${currentDay}','${(ev.title+' — '+p.q).replace(/'/g,"\\'")}','prop','${p.id}','${o.label.replace(/'/g,"\\'")}',${o.odds},'${p.id}')">
-              <div class="side">${o.label}</div><div class="odds">${fmtOdds(o.odds)}</div>
+              <div class="side">${o.label}${badge}</div><div class="odds">${fmtOdds(o.odds)}</div>
             </div>`;
           }).join("");
           return `<div style="margin-bottom:14px;">
@@ -938,18 +944,70 @@ function findEvent(eventId){
 }
 
 /* ---------- MY BETS ---------- */
+let currentBetsTab = "mine"; // mine | everyone
+let allBetsGlobal = {}; // {uid: {betId: bet}} — loaded on demand, see loadAllBets()
+
 function renderMyBets(main){
   document.getElementById("slipFab").classList.remove("hidden");
   updateSlipFab();
-  const arr = Object.entries(allBets||{}).map(([id,b])=>({id,...b})).sort((a,b)=>b.placedAt-a.placedAt);
-  if(arr.length===0){ main.innerHTML = '<div class="card empty">No bets placed yet. Head to Game Bets or Prop Bets to get started.</div>'; return; }
 
-  main.innerHTML = arr.map(b=>{
+  const tabsHtml = ["mine","everyone"].map(t=>
+    `<button class="${t===currentBetsTab?'active':''}" onclick="setBetsTab('${t}')">${t==='mine'?'My Bets':"Everyone's Bets"}</button>`
+  ).join("");
+
+  let body;
+  if(currentBetsTab==="mine"){
+    body = renderBetCardsHtml(Object.entries(allBets||{}).map(([id,b])=>({id,...b,anglerName:null})));
+  } else {
+    const all = [];
+    for(const uid in allBetsGlobal){
+      const name = (allUsers[uid]&&allUsers[uid].name) || "Angler";
+      for(const id in allBetsGlobal[uid]){
+        all.push({ id, ...allBetsGlobal[uid][id], anglerName:name });
+      }
+    }
+    body = `<button class="btn btn-secondary" style="margin-bottom:12px;" onclick="loadAllBets(true)">🔄 Refresh</button>` + renderBetCardsHtml(all);
+  }
+
+  main.innerHTML = `<div class="subtabs">${tabsHtml}</div>${body}`;
+}
+function setBetsTab(t){
+  currentBetsTab = t;
+  renderView();
+  if(t==="everyone") loadAllBets(false);
+  window.scrollTo(0,0);
+}
+
+async function loadAllBets(manualRefresh){
+  try{
+    const usersSnap = await db.ref("users").get();
+    const users = usersSnap.val()||{};
+    const result = {};
+    for(const uid in users){
+      const betsSnap = await db.ref("bets/"+uid).get();
+      const bets = betsSnap.val();
+      if(bets) result[uid] = bets;
+    }
+    allBetsGlobal = result;
+    if(currentView==="mybets" && currentBetsTab==="everyone") renderView();
+    if(manualRefresh) toast("Refreshed.");
+  }catch(err){
+    console.error("loadAllBets failed", err);
+    toast("Couldn't load everyone's bets: " + err.message);
+  }
+}
+
+function renderBetCardsHtml(arr){
+  arr.sort((a,b)=>b.placedAt-a.placedAt);
+  if(arr.length===0) return '<div class="card empty">No bets placed yet.</div>';
+  return arr.map(b=>{
     const legsHtml = b.legs.map(l=>`<div style="font-size:.8rem;color:var(--muted);">${l.eventTitle} — <b style="color:var(--text);">${l.label}</b> (${fmtOdds(l.americanOdds)})</div>`).join("");
     let statusHtml = `<span style="color:var(--muted);">Pending</span>`;
     if(b.status==="won") statusHtml = `<span class="badge-win">Won +${b.payout?.toFixed(0)}</span>`;
     if(b.status==="lost") statusHtml = `<span class="badge-lose">Lost -${b.stake}</span>`;
+    const whoHtml = b.anglerName ? `<div style="font-size:.75rem;color:var(--accent2);margin-bottom:4px;">${b.anglerName}</div>` : "";
     return `<div class="card">
+      ${whoHtml}
       <div style="display:flex;justify-content:space-between;">
         <b>${b.type==='parlay'?'Parlay':'Single'} · ${b.stake} credits</b>
         ${statusHtml}
@@ -1394,6 +1452,9 @@ async function settleGameOutcome(eventId, outcome, silent){
       }
     }
   }
+  // Mark the event itself so the UI can show ✅/❌ on the actual winning/losing pick
+  const ev = findEvent(eventId);
+  if(ev){ ev.settled = true; ev.settledOutcome = outcome; }
   if(!silent) toast("Settled game: "+eventId);
   return touched;
 }
@@ -1437,6 +1498,9 @@ async function settlePropBet(){
       }
     }
   }
+  // Mark the prop itself so the UI can show ✅/❌ on the actual winning/losing option
+  const found = findPropById(propId);
+  if(found){ found.prop.settled = true; found.prop.winningLabel = winningLabel; }
   toast("Settled prop: "+propId);
   renderAdmin(document.getElementById("main"));
 }
