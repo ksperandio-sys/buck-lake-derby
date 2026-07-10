@@ -84,11 +84,21 @@ Right now anyone signed in can write anywhere. At minimum:
     "allowedEmails": {
       ".read": "auth != null",
       ".write": "auth != null"
+    },
+    "settledEvents": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "settledProps": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     }
   }
 }
 ```
 This stops people from editing each other's credit totals or catch records directly. It does **not** stop someone from calling `settleEvent()` or `verifyCatch()` from the console — for a friend-group pool that's probably fine, but if you want it airtight, both should move to a Cloud Function later (and the `users` write rule above is a placeholder — proper admin-gated writes need a real admin list stored server-side, not just client-side `ADMIN_EMAILS`).
+
+`settledEvents` and `settledProps` are what make the ✅/❌ result badges show up on the actual pick buttons once something's settled — they record which outcome/option won so every user's browser (and a fresh page load) shows the same result, not just the settling admin's own session.
 
 ## How the mechanics work
 - **Credits**: everyone starts at 100 — one single cumulative balance for the whole weekend, not reset per day. Stake is deducted the moment a bet is placed (escrowed); payout = stake × decimal odds, credited back on settlement if the pick wins. Winnings from Thursday's games are just as spendable on Sunday's as the original 100 were.
