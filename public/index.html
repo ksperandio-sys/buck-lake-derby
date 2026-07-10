@@ -297,48 +297,11 @@ function cflProps(gameId, homeLabel, awayLabel, totalPoints){
 }
 
 let EVENTS = {
-  "2026-07-09": {
-    "World Cup": [
-      { id:"wc_qf1", title:"Quarterfinal 1: France vs. Morocco", teams:["France","Morocco"], time:"2026-07-09T16:00:00-04:00",
-        odds:{home:-110, away:-110}, props:[
-          { id:"wc_qf1_ot", q:"Match decided in extra time or penalties?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
-          { id:"wc_qf1_gt3", q:"Total goals over/under 2.5", options:[{label:"Over 2.5",odds:-105},{label:"Under 2.5",odds:-115}] }
-        ]}
-    ],
-    "Wimbledon": [
-      { id:"wim_w_semi1", title:"Women's Semifinal 1: Karolina Muchova vs. Coco Gauff", teams:["Karolina Muchova","Coco Gauff"], time:"2026-07-09T08:30:00-04:00",
-        odds:{home:-140, away:120}, props:[
-          { id:"wim_w_semi1_sets", q:"Match goes 3 sets?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
-          { id:"wim_w_semi1_df", q:"Total double faults (both players combined) over/under 12.5", options:[{label:"Over 12.5",odds:-110},{label:"Under 12.5",odds:-110}] }
-        ]},
-      { id:"wim_w_semi2", title:"Women's Semifinal 2: Linda Noskova vs. Marta Kostyuk", teams:["Linda Noskova","Marta Kostyuk"], time:"2026-07-09T10:30:00-04:00",
-        odds:{home:130, away:-150}, props:[
-          { id:"wim_w_semi2_sets", q:"Match goes 3 sets?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
-          { id:"wim_w_semi2_df", q:"Total double faults (both players combined) over/under 12.5", options:[{label:"Over 12.5",odds:-110},{label:"Under 12.5",odds:-110}] }
-        ]}
-    ],
-    "CFL": [
-      { id:"cfl_wk6_1", title:"Ottawa Redblacks @ Edmonton Elks", teams:["Edmonton Elks","Ottawa Redblacks"], time:"2026-07-09T21:00:00-04:00",
-        odds:{home:-305, away:245}, props: cflProps("cfl_wk6_1","Edmonton Elks","Ottawa Redblacks",58.5)}
-    ]
-  },
   "2026-07-10": {
     "World Cup": [
       { id:"wc_qf2", title:"Quarterfinal 2: Spain vs. Belgium", teams:["Spain","Belgium"], time:"2026-07-10T15:00:00-04:00",
         odds:{home:-150, away:280}, props:[
           { id:"wc_qf2_bts", q:"Both teams to score?", options:[{label:"Yes",odds:-120},{label:"No",odds:100}] }
-        ]}
-    ],
-    "Wimbledon": [
-      { id:"wim_m_semi1", title:"Men's Semifinal 1: Alexander Zverev vs. Arthur Fery", teams:["Alexander Zverev","Arthur Fery"], time:"2026-07-10T08:30:00-04:00",
-        odds:{home:-600, away:450}, props:[
-          { id:"wim_m_semi1_sets", q:"Match goes 5 sets?", options:[{label:"Yes",odds:170},{label:"No",odds:-200}] },
-          { id:"wim_m_semi1_df", q:"Total double faults (both players combined) over/under 14.5", options:[{label:"Over 14.5",odds:-110},{label:"Under 14.5",odds:-110}] }
-        ]},
-      { id:"wim_m_semi2", title:"Men's Semifinal 2: Jannik Sinner vs. Novak Djokovic", teams:["Jannik Sinner","Novak Djokovic"], time:"2026-07-10T10:30:00-04:00",
-        odds:{home:-140, away:120}, props:[
-          { id:"wim_m_semi2_sets", q:"Match goes 5 sets?", options:[{label:"Yes",odds:170},{label:"No",odds:-200}] },
-          { id:"wim_m_semi2_df", q:"Total double faults (both players combined) over/under 14.5", options:[{label:"Over 14.5",odds:-110},{label:"Under 14.5",odds:-110}] }
         ]}
     ],
     "MLB": [
@@ -433,7 +396,7 @@ let currentUser = null;
 let userCredits = 100;
 let userIsAdmin = false;
 let currentView = "leaderboard";
-let currentDay = "2026-07-09";
+let currentDay = "2026-07-10";
 let currentDerbyTab = "leaderboard"; // leaderboard | log | mine
 let slip = []; // {eventId, day, sport, eventTitle, pickType:'game'|'prop', propId?, label, americanOdds}
 let allUsers = {};
