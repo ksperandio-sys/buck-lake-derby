@@ -289,6 +289,13 @@ function mlbProps(gameId, homeLabel, awayLabel){
   ];
 }
 
+function cflProps(gameId, homeLabel, awayLabel, totalPoints){
+  return [
+    { id:gameId+"_pts", q:`Total points over/under ${totalPoints}`, options:[{label:`Over ${totalPoints}`,odds:-110},{label:`Under ${totalPoints}`,odds:-110}] },
+    { id:gameId+"_fts", q:"First team to score", options:[{label:homeLabel,odds:-120},{label:awayLabel,odds:100}] }
+  ];
+}
+
 let EVENTS = {
   "2026-07-09": {
     "World Cup": [
@@ -309,6 +316,10 @@ let EVENTS = {
           { id:"wim_w_semi2_sets", q:"Match goes 3 sets?", options:[{label:"Yes",odds:150},{label:"No",odds:-180}] },
           { id:"wim_w_semi2_df", q:"Total double faults (both players combined) over/under 12.5", options:[{label:"Over 12.5",odds:-110},{label:"Under 12.5",odds:-110}] }
         ]}
+    ],
+    "CFL": [
+      { id:"cfl_wk6_1", title:"Ottawa Redblacks @ Edmonton Elks", teams:["Edmonton Elks","Ottawa Redblacks"], time:"2026-07-09T21:00:00-04:00",
+        odds:{home:-305, away:245}, props: cflProps("cfl_wk6_1","Edmonton Elks","Ottawa Redblacks",58.5)}
     ]
   },
   "2026-07-10": {
@@ -333,6 +344,10 @@ let EVENTS = {
     "MLB": [
       { id:"mlb_jul10_1", title:"Toronto Blue Jays @ San Diego Padres", teams:["Padres","Blue Jays"], time:"2026-07-10T21:40:00-04:00",
         odds:{home:-115, away:-105}, props: mlbProps("mlb_jul10_1","Padres","Blue Jays")}
+    ],
+    "CFL": [
+      { id:"cfl_wk6_2", title:"Toronto Argonauts @ Winnipeg Blue Bombers", teams:["Winnipeg Blue Bombers","Toronto Argonauts"], time:"2026-07-10T20:30:00-04:00",
+        odds:{home:120, away:-142}, props: cflProps("cfl_wk6_2","Winnipeg Blue Bombers","Toronto Argonauts",60.5)}
     ]
   },
   "2026-07-11": {
@@ -359,6 +374,10 @@ let EVENTS = {
         odds:{home:-165, away:145}, props: mlbProps("mlb_dodgers_ari_1","Dodgers","Diamondbacks")},
       { id:"mlb_jays_jul11", title:"Toronto Blue Jays @ San Diego Padres", teams:["Padres","Blue Jays"], time:"2026-07-11T20:40:00-04:00",
         odds:{home:-115, away:-105}, props: mlbProps("mlb_jays_jul11","Padres","Blue Jays")}
+    ],
+    "CFL": [
+      { id:"cfl_wk6_3", title:"Calgary Stampeders @ Montreal Alouettes", teams:["Montreal Alouettes","Calgary Stampeders"], time:"2026-07-11T19:00:00-04:00",
+        odds:{home:-205, away:170}, props: cflProps("cfl_wk6_3","Montreal Alouettes","Calgary Stampeders",62.5)}
     ],
     "UFC 329 — Early Prelims (5pm ET)": [
       mmaFight("ufc_ep1","2026-07-11T17:00:00-04:00","Tracy Cortez",-135,"Cong Wang",115,3),
@@ -394,6 +413,10 @@ let EVENTS = {
         odds:{home:-155, away:135}, props: mlbProps("mlb_dodgers_ari_2","Dodgers","Diamondbacks")},
       { id:"mlb_jays_jul12", title:"Toronto Blue Jays @ San Diego Padres", teams:["Padres","Blue Jays"], time:"2026-07-12T16:10:00-04:00",
         odds:{home:-110, away:-110}, props: mlbProps("mlb_jays_jul12","Padres","Blue Jays")}
+    ],
+    "CFL": [
+      { id:"cfl_wk6_4", title:"Hamilton Tiger-Cats @ Saskatchewan Roughriders", teams:["Saskatchewan Roughriders","Hamilton Tiger-Cats"], time:"2026-07-12T19:00:00-04:00",
+        odds:{home:-380, away:300}, props: cflProps("cfl_wk6_4","Saskatchewan Roughriders","Hamilton Tiger-Cats",54.5)}
     ]
   }
 };
@@ -1461,7 +1484,8 @@ const SPORT_KEYS = {
   // show up as if they were part of UFC 329.
   "mma_mixed_martial_arts":{ sportLabel:"UFC 329 — Main Card (9pm ET)", dayFilter:"2026-07-11", noAutoAdd:true },
   "tennis_atp_wimbledon":  { sportLabel:"Wimbledon" },
-  "tennis_wta_wimbledon":  { sportLabel:"Wimbledon" }
+  "tennis_wta_wimbledon":  { sportLabel:"Wimbledon" },
+  "americanfootball_cfl":  { sportLabel:"CFL" }
 };
 let _oddsRefreshTimer = null;
 let lastOddsRefresh = null;
