@@ -1229,7 +1229,19 @@ function renderAdmin(main){
     `<div class="leg"><span>${e}</span><span class="x" onclick="removeAllowedEmail('${e}')">✕</span></div>`
   ).join("") || '<p style="font-size:.8rem;color:var(--muted);">No list yet — anyone with a Google account can currently join.</p>';
 
+  if(!currentSettleDay || !EVENTS[currentSettleDay]) currentSettleDay = Object.keys(EVENTS)[0];
+  const settleDayTabs = Object.keys(EVENTS).map(d=>
+    `<button class="${d===currentSettleDay?'active':''}" onclick="setSettleDay('${d}')">${DAY_LABELS[d]}</button>`
+  ).join("");
+
   main.innerHTML = `
+    <div class="card adminbox">
+      <h3 style="margin-top:0;">⚡ Quick Settle</h3>
+      <p style="font-size:.8rem;">Browse by day, tap the outcome that actually happened. No IDs to type — this covers both games and props. Already-settled ones show ✅/❌; tap again to correct a mistake.</p>
+      <div class="subtabs">${settleDayTabs}</div>
+      <div>${renderQuickSettleHtml(currentSettleDay)}</div>
+    </div>
+
     <div class="card adminbox">
       <h3 style="margin-top:0;">⚙️ Admin</h3>
 
@@ -1395,6 +1407,57 @@ function adminAddEvent(){
 // on the same event (or vice versa), since both share the same eventId.
 function legMarketKey(leg){
   return leg.pickType==="game" ? "game:"+leg.eventId : "prop:"+leg.propId;
+}
+
+let currentSettleDay = null;
+function setSettleDay(day){ currentSettleDay = day; renderAdmin(document.getElementById("main")); }
+
+function renderQuickSettleHtml(day){
+  const daySports = EVENTS[day] || {};
+  let html = "";
+  for(const sport in daySports){
+    const events = daySports[sport];
+    if(!events.length) continue;
+    html += `<div class="sport-header" style="margin-top:14px;">${sport}</div>`;
+    events.forEach(ev=>{
+      const gameSettled = !!ev.settled;
+      const gameBtn = (pick,label,americanOdds)=>{
+        const isWinner = gameSettled && ev.settledOutcome===pick;
+        const isLoser = gameSettled && ev.settledOutcome!==pick;
+        const badge = isWinner ? ' ✅' : isLoser ? ' ❌' : '';
+        return `<button class="btn ${isWinner?'':'btn-secondary'}" style="width:auto;padding:8px 12px;font-size:.8rem;margin:3px 4px 3px 0;"
+          onclick="settleGameOutcome('${ev.id}','${pick}',false).then(()=>renderAdmin(document.getElementById('main')))">${label} (${fmtOdds(americanOdds)})${badge}</button>`;
+      };
+      let gameButtons = "";
+      if(!ev.isOutright && ev.odds && (ev.odds.home!==undefined)){
+        gameButtons = gameBtn('home', ev.teams[0], ev.odds.home)
+          + (ev.odds.draw!==undefined ? gameBtn('draw','Draw', ev.odds.draw) : "")
+          + gameBtn('away', ev.teams[1], ev.odds.away);
+      }
+
+      let propsHtml = "";
+      (ev.props||[]).forEach(p=>{
+        const optBtns = (p.options||[]).map(o=>{
+          const isWinner = p.settled && p.winningLabel===o.label;
+          const isLoser = p.settled && p.winningLabel!==o.label;
+          const badge = isWinner ? ' ✅' : isLoser ? ' ❌' : '';
+          return `<button class="btn ${isWinner?'':'btn-secondary'}" style="width:auto;padding:8px 12px;font-size:.8rem;margin:3px 4px 3px 0;"
+            onclick="settlePropOutcome('${p.id}','${o.label.replace(/'/g,"\\'")}',false).then(()=>renderAdmin(document.getElementById('main')))">${o.label} (${fmtOdds(o.odds)})${badge}</button>`;
+        }).join("");
+        propsHtml += `<div style="margin-top:8px;">
+          <div style="font-size:.8rem;color:var(--muted);">${p.q}</div>
+          <div style="display:flex;flex-wrap:wrap;">${optBtns}</div>
+        </div>`;
+      });
+
+      html += `<div class="leg" style="flex-direction:column;align-items:stretch;height:auto;">
+        <div style="font-size:.85rem;font-weight:600;margin-bottom:4px;">${ev.title}${gameSettled?' <span style="color:var(--win);font-size:.75rem;">(settled)</span>':''}</div>
+        ${gameButtons ? `<div style="display:flex;flex-wrap:wrap;">${gameButtons}</div>` : ''}
+        ${propsHtml}
+      </div>`;
+    });
+  }
+  return html || '<p style="font-size:.85rem;color:var(--muted);">Nothing scheduled this day.</p>';
 }
 
 function renderPropIdsReferenceHtml(){
