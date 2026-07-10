@@ -1001,7 +1001,27 @@ function renderBetCardsHtml(arr){
   arr.sort((a,b)=>b.placedAt-a.placedAt);
   if(arr.length===0) return '<div class="card empty">No bets placed yet.</div>';
   return arr.map(b=>{
-    const legsHtml = b.legs.map(l=>`<div style="font-size:.8rem;color:var(--muted);">${l.eventTitle} — <b style="color:var(--text);">${l.label}</b> (${fmtOdds(l.americanOdds)})</div>`).join("");
+    const legsHtml = b.legs.map(l=>{
+      // Singles: status is just the bet's overall status. Parlays: each leg
+      // settles independently via legResults, well before the whole bet
+      // resolves — show that per-leg progress instead of leaving every leg
+      // looking identically "unresolved" until the very last one comes in.
+      let legStatus;
+      if(b.type==="single"){
+        legStatus = b.status==="won" ? '<span style="color:var(--win);">✅ Won</span>'
+                  : b.status==="lost" ? '<span style="color:var(--lose);">❌ Lost</span>'
+                  : '<span style="color:var(--muted);">⏳ Pending</span>';
+      } else {
+        const result = b.legResults ? b.legResults[legMarketKey(l)] : undefined;
+        legStatus = result===true ? '<span style="color:var(--win);">✅ Won</span>'
+                  : result===false ? '<span style="color:var(--lose);">❌ Lost</span>'
+                  : '<span style="color:var(--muted);">⏳ Pending</span>';
+      }
+      return `<div style="font-size:.8rem;color:var(--muted);display:flex;justify-content:space-between;gap:8px;padding:3px 0;">
+        <span>${l.eventTitle} — <b style="color:var(--text);">${l.label}</b> (${fmtOdds(l.americanOdds)})</span>
+        <span style="white-space:nowrap;font-size:.75rem;">${legStatus}</span>
+      </div>`;
+    }).join("");
     let statusHtml = `<span style="color:var(--muted);">Pending</span>`;
     if(b.status==="won") statusHtml = `<span class="badge-win">Won +${b.payout?.toFixed(0)}</span>`;
     if(b.status==="lost") statusHtml = `<span class="badge-lose">Lost -${b.stake}</span>`;
@@ -1452,9 +1472,12 @@ async function settleGameOutcome(eventId, outcome, silent){
       }
     }
   }
-  // Mark the event itself so the UI can show ✅/❌ on the actual winning/losing pick
+  // Mark the event locally (immediate UI feedback) AND persist to Firebase so
+  // every user's browser shows the same ✅/❌, and it survives a page refresh —
+  // this was previously only ever set in the settling admin's own local memory.
   const ev = findEvent(eventId);
   if(ev){ ev.settled = true; ev.settledOutcome = outcome; }
+  await db.ref("settledEvents/"+eventId).set({outcome});
   if(!silent) toast("Settled game: "+eventId);
   return touched;
 }
@@ -1498,9 +1521,10 @@ async function settlePropBet(){
       }
     }
   }
-  // Mark the prop itself so the UI can show ✅/❌ on the actual winning/losing option
+  // Mark the prop locally AND persist to Firebase — same reasoning as above.
   const found = findPropById(propId);
   if(found){ found.prop.settled = true; found.prop.winningLabel = winningLabel; }
+  await db.ref("settledProps/"+propId).set({winningLabel});
   toast("Settled prop: "+propId);
   renderAdmin(document.getElementById("main"));
 }
@@ -1757,6 +1781,28 @@ db.ref("eventsOverride").on("value", snap=>{
       // sportKey was sanitized on save; find matching real sport name or just use as-is
       EVENTS[day][sportKey] = overrides[day][sportKey];
     }
+  }
+  if(currentView==="games"||currentView==="props") renderView();
+});
+
+/* Apply settled game/prop results from Firebase to every user's local EVENTS —
+   this is what makes the ✅/❌ badges show up for everyone, survive a refresh,
+   and not just live in the settling admin's own browser memory. */
+db.ref("settledEvents").on("value", snap=>{
+  const settled = snap.val();
+  if(!settled) return;
+  for(const eventId in settled){
+    const ev = findEvent(eventId);
+    if(ev){ ev.settled = true; ev.settledOutcome = settled[eventId].outcome; }
+  }
+  if(currentView==="games"||currentView==="props") renderView();
+});
+db.ref("settledProps").on("value", snap=>{
+  const settled = snap.val();
+  if(!settled) return;
+  for(const propId in settled){
+    const found = findPropById(propId);
+    if(found){ found.prop.settled = true; found.prop.winningLabel = settled[propId].winningLabel; }
   }
   if(currentView==="games"||currentView==="props") renderView();
 });
