@@ -363,8 +363,8 @@ let EVENTS = {
         ]}
     ],
     "Wimbledon": [
-      { id:"wim_womens_final", title:"Women's Singles Final", teams:["TBD","TBD"], time:"2026-07-11T09:00:00-04:00",
-        odds:{home:-150, away:130}, props:[
+      { id:"wim_womens_final", title:"Women's Singles Final: Karolina Muchova vs. Linda Noskova", teams:["Karolina Muchova","Linda Noskova"], time:"2026-07-11T09:00:00-04:00",
+        odds:{home:-130, away:110}, props:[
           { id:"wim_w_sets", q:"Match goes to 3 sets?", options:[{label:"Yes",odds:145},{label:"No",odds:-175}] },
           { id:"wim_w_final_df", q:"Total double faults (both players combined) over/under 12.5", options:[{label:"Over 12.5",odds:-110},{label:"Under 12.5",odds:-110}] }
         ]}
@@ -912,6 +912,18 @@ async function placeBet(){
   const userRef = db.ref("users/"+currentUser.uid);
 
   try{
+    // Atomic transaction, not a read-then-write — placing several bets in quick
+    // succession (very possible with parlays) could otherwise read the same
+    // stale credit total each time and have the last write silently erase
+    // earlier deductions. This is safe no matter how fast bets come in.
+    let insufficientFunds = false;
+    const txResult = await userRef.child("credits").transaction(current=>{
+      const cur = current ?? userCredits;
+      if(cur < totalStakeNeeded){ insufficientFunds = true; return cur; } // abort, unchanged
+      return cur - totalStakeNeeded;
+    });
+    if(insufficientFunds || !txResult.committed){ toast("Not enough credits."); return; }
+
     if(mode==="parlay"){
       await betsRef.push({
         type:"parlay", legs:slip, stake, placedAt:Date.now(), status:"pending"
@@ -921,7 +933,6 @@ async function placeBet(){
         await betsRef.push({ type:"single", legs:[l], stake, placedAt:Date.now(), status:"pending" });
       }
     }
-    await userRef.child("credits").set(userCredits - totalStakeNeeded);
   }catch(err){
     console.error("placeBet failed", err);
     toast("Bet didn't go through — " + (err.code==="PERMISSION_DENIED" ? "check your database security rules." : err.message));
@@ -1527,9 +1538,7 @@ async function settleGameOutcome(eventId, outcome, silent){
         const payout = won ? bet.stake * oddsDecimal(relevantLeg.americanOdds) : 0;
         await db.ref(`bets/${uid}/${betId}`).update({status:newStatus, payout});
         if(won){
-          const uref = db.ref("users/"+uid+"/credits");
-          const cur = (await uref.get()).val()||0;
-          await uref.set(cur + payout);
+          await db.ref("users/"+uid+"/credits").transaction(cur=> (cur||0) + payout);
         }
       } else {
         await resolveParlayLeg(uid, betId, bet, legMarketKey(relevantLeg), won);
@@ -1574,9 +1583,7 @@ async function settlePropOutcome(propId, winningLabel, silent){
         const payout = won ? bet.stake * oddsDecimal(relevantLeg.americanOdds) : 0;
         await db.ref(`bets/${uid}/${betId}`).update({status:newStatus, payout});
         if(won){
-          const uref = db.ref("users/"+uid+"/credits");
-          const cur = (await uref.get()).val()||0;
-          await uref.set(cur + payout);
+          await db.ref("users/"+uid+"/credits").transaction(cur=> (cur||0) + payout);
         }
       } else {
         await resolveParlayLeg(uid, betId, bet, legMarketKey(relevantLeg), won);
@@ -1654,9 +1661,7 @@ async function resolveParlayLeg(uid, betId, bet, marketKey, won){
       bet.legs.forEach(l=> combinedDecimal *= oddsDecimal(l.americanOdds));
       const payout = bet.stake * combinedDecimal;
       await db.ref(`bets/${uid}/${betId}`).update({status:"won", payout});
-      const uref = db.ref("users/"+uid+"/credits");
-      const cur = (await uref.get()).val()||0;
-      await uref.set(cur + payout);
+      await db.ref("users/"+uid+"/credits").transaction(cur=> (cur||0) + payout);
     } else {
       await db.ref(`bets/${uid}/${betId}`).update({status:"lost", payout:0});
     }
@@ -1879,12 +1884,38 @@ async function autoFetchScores(){
 }
 
 function startAutoOddsRefresh(){
-  autoFetchOdds(true); autoFetchScores(); // immediately on login
+  if(!userIsAdmin){
+    // Non-admins never call the odds API directly — with everyone's browser
+    // polling independently, quota usage multiplied by however many friends
+    // had the app open at once, burning through the free tier in under an
+    // hour with just a handful of people online simultaneously. Instead,
+    // only the admin's session fetches, then syncs the results to Firebase
+    // via the same eventsOverride mechanism already used for admin-added
+    // events — everyone else picks it up from there for free.
+    return;
+  }
+  autoFetchOdds(true).then(syncEventsToFirebase);
+  autoFetchScores().then(syncEventsToFirebase);
   if(_oddsRefreshTimer) clearInterval(_oddsRefreshTimer);
-  _oddsRefreshTimer = setInterval(()=>{ autoFetchOdds(true); autoFetchScores(); }, 5*60*1000); // every 5 min while app is open
+  _oddsRefreshTimer = setInterval(()=>{
+    autoFetchOdds(true).then(syncEventsToFirebase);
+    autoFetchScores().then(syncEventsToFirebase);
+  }, 5*60*1000);
 }
 // kept as an alias so the Admin "force refresh" button still works
-async function refreshOddsFromApi(){ await autoFetchOdds(false); await autoFetchScores(); }
+async function refreshOddsFromApi(){ await autoFetchOdds(false); await autoFetchScores(); await syncEventsToFirebase(); }
+
+// Pushes the admin's freshly-fetched EVENTS (odds, real matchups, scores) to
+// Firebase so every other signed-in user picks it up via the existing
+// eventsOverride listener, without any of them needing to call the API.
+async function syncEventsToFirebase(){
+  for(const day in EVENTS){
+    for(const sport in EVENTS[day]){
+      const sanitized = sport.replace(/[.#$\[\]]/g,"_");
+      await db.ref("eventsOverride/"+day+"/"+sanitized).set(EVENTS[day][sport]);
+    }
+  }
+}
 
 /* Load any admin-added events from Firebase on startup, merging into local EVENTS */
 db.ref("eventsOverride").on("value", snap=>{
